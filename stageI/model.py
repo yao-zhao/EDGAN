@@ -220,5 +220,5 @@ class CondGAN(object):
         c_code = tf.expand_dims(tf.expand_dims(c_code, 1), 1)
         c_code = tf.tile(c_code, [1, self.s16, self.s16, 1])
 
-        x_c_code = tf.concat(3, [x_code, c_code])
+        x_c_code = tf.concat([x_code, c_code], 3)
         return self.discriminator_template.construct(input=x_c_code)

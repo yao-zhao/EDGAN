@@ -114,7 +114,7 @@ class CondGANTrainer(object):
                 z = tf.random_normal([self.batch_size, cfg.Z_DIM])
                 self.log_vars.append(("hist_c", c))
                 self.log_vars.append(("hist_z", z))
-                fake_images = self.model.get_generator(tf.concat(1, [c, z]))
+                fake_images = self.model.get_generator(tf.concat([c, z], 1))
 
             # ####get discriminator_loss and generator_loss ###################
             discriminator_loss, generator_loss =\
@@ -158,7 +158,7 @@ class CondGANTrainer(object):
         with tf.variable_scope("g_net", reuse=True):
             c, _ = self.sample_encoded_context(self.embeddings)
             z = tf.random_normal([self.batch_size, cfg.Z_DIM])
-            self.fake_images = self.model.get_generator(tf.concat(1, [c, z]))
+            self.fake_images = self.model.get_generator(tf.concat([c, z], 1))
         with tf.variable_scope("hr_g_net", reuse=True):
             hr_c, _ = self.sample_encoded_context(self.embeddings)
             self.hr_fake_images =\
@@ -182,16 +182,19 @@ class CondGANTrainer(object):
                 self.model.hr_get_discriminator(fake_images, embeddings)
 
         real_d_loss =\
-            tf.nn.sigmoid_cross_entropy_with_logits(real_logit,
-                                                    tf.ones_like(real_logit))
+            tf.nn.sigmoid_cross_entropy_with_logits(
+                                                    labels = tf.ones_like(real_logit),
+                                                    logits = real_logit)
         real_d_loss = tf.reduce_mean(real_d_loss)
         wrong_d_loss =\
-            tf.nn.sigmoid_cross_entropy_with_logits(wrong_logit,
-                                                    tf.zeros_like(wrong_logit))
+            tf.nn.sigmoid_cross_entropy_with_logits(
+                                                    labels = tf.zeros_like(wrong_logit),
+                                                    logits = wrong_logit,)
         wrong_d_loss = tf.reduce_mean(wrong_d_loss)
         fake_d_loss =\
-            tf.nn.sigmoid_cross_entropy_with_logits(fake_logit,
-                                                    tf.zeros_like(fake_logit))
+            tf.nn.sigmoid_cross_entropy_with_logits(
+                                                    labels = tf.zeros_like(fake_logit),
+                                                    logits = fake_logit,)
         fake_d_loss = tf.reduce_mean(fake_d_loss)
         if cfg.TRAIN.B_WRONG:
             discriminator_loss =\
@@ -210,8 +213,9 @@ class CondGANTrainer(object):
                 self.log_vars.append(("hr_d_loss_wrong", wrong_d_loss))
 
         generator_loss = \
-            tf.nn.sigmoid_cross_entropy_with_logits(fake_logit,
-                                                    tf.ones_like(fake_logit))
+            tf.nn.sigmoid_cross_entropy_with_logits(
+                                                    labels = tf.ones_like(fake_logit),
+                                                    logits = fake_logit,)
         generator_loss = tf.reduce_mean(generator_loss)
         if flag == 'lr':
             self.log_vars.append(("g_loss_fake", generator_loss))
@@ -263,21 +267,21 @@ class CondGANTrainer(object):
         all_sum = {'g': [], 'd': [], 'hr_g': [], 'hr_d': [], 'hist': []}
         for k, v in self.log_vars:
             if k.startswith('g'):
-                all_sum['g'].append(tf.scalar_summary(k, v))
+                all_sum['g'].append(tf.summary.scalar(k, v))
             elif k.startswith('d'):
-                all_sum['d'].append(tf.scalar_summary(k, v))
+                all_sum['d'].append(tf.summary.scalar(k, v))
             elif k.startswith('hr_g'):
-                all_sum['hr_g'].append(tf.scalar_summary(k, v))
+                all_sum['hr_g'].append(tf.summary.scalar(k, v))
             elif k.startswith('hr_d'):
-                all_sum['hr_d'].append(tf.scalar_summary(k, v))
+                all_sum['hr_d'].append(tf.summary.scalar(k, v))
             elif k.startswith('hist'):
-                all_sum['hist'].append(tf.histogram_summary(k, v))
+                all_sum['hist'].append(tf.summary.histogram(k, v))
 
-        self.g_sum = tf.merge_summary(all_sum['g'])
-        self.d_sum = tf.merge_summary(all_sum['d'])
-        self.hr_g_sum = tf.merge_summary(all_sum['hr_g'])
-        self.hr_d_sum = tf.merge_summary(all_sum['hr_d'])
-        self.hist_sum = tf.merge_summary(all_sum['hist'])
+        # self.g_sum = tf.merge_summary(all_sum['g'])
+        # self.d_sum = tf.merge_summary(all_sum['d'])
+        # self.hr_g_sum = tf.merge_summary(all_sum['hr_g'])
+        # self.hr_d_sum = tf.merge_summary(all_sum['hr_d'])
+        # self.hist_sum = tf.merge_summary(all_sum['hist'])
 
     def visualize_one_superimage(self, img_var, images, rows, filename):
         stacked_img = []
@@ -287,9 +291,9 @@ class CondGANTrainer(object):
             for col in range(rows):
                 row_img.append(img_var[row * rows + col, :, :, :])
             # each rows is 1realimage +10_fakeimage
-            stacked_img.append(tf.concat(1, row_img))
-        imgs = tf.expand_dims(tf.concat(0, stacked_img), 0)
-        current_img_summary = tf.image_summary(filename, imgs)
+            stacked_img.append(tf.concat(row_img, 1))
+        imgs = tf.expand_dims(tf.concat(stacked_img, 0), 0)
+        current_img_summary = tf.summary.image(filename, imgs)
         return current_img_summary, imgs
 
     def visualization(self, n):
@@ -301,8 +305,9 @@ class CondGANTrainer(object):
             self.visualize_one_superimage(self.fake_images[n * n:2 * n * n],
                                           self.images[n * n:2 * n * n],
                                           n, "test")
-        self.superimages = tf.concat(0, [superimage_train, superimage_test])
-        self.image_summary = tf.merge_summary([fake_sum_train, fake_sum_test])
+        self.superimages = tf.concat([superimage_train, superimage_test], 0)
+        # self.image_summary = tf.merge_summary([fake_sum_train, fake_sum_test])
+        self.image_summary = tf.summary.merge_all()
 
         hr_fake_sum_train, hr_superimage_train =\
             self.visualize_one_superimage(self.hr_fake_images[:n * n],
@@ -313,9 +318,9 @@ class CondGANTrainer(object):
                                           self.hr_images[n * n:2 * n * n],
                                           n, "hr_test")
         self.hr_superimages =\
-            tf.concat(0, [hr_superimage_train, hr_superimage_test])
-        self.hr_image_summary =\
-            tf.merge_summary([hr_fake_sum_train, hr_fake_sum_test])
+            tf.concat([hr_superimage_train, hr_superimage_test], 0)
+        # self.hr_image_summary =\
+        #     tf.merge_summary([hr_fake_sum_train, hr_fake_sum_test])
 
     def preprocess(self, x, n):
         # make sure every row with n column have the same embeddings
@@ -417,42 +422,53 @@ class CondGANTrainer(object):
         if cfg.TRAIN.FINETUNE_LR:
             # train d1
             feed_out_d = [self.hr_discriminator_trainer,
-                          self.hr_d_sum,
+                          # self.hr_d_sum,
                           log_vars,
-                          self.hist_sum]
+                          # self.hist_sum
+                          ]
             ret_list = sess.run(feed_out_d, feed_dict)
-            summary_writer.add_summary(ret_list[1], counter)
+            # summary_writer.add_summary(ret_list[1], counter)
             log_vals = ret_list[2]
-            summary_writer.add_summary(ret_list[3], counter)
+            # summary_writer.add_summary(ret_list[3], counter)
             # train g1 and finetune g0 with the loss of g1
             feed_out_g = [self.hr_generator_trainer,
                           self.ft_generator_trainer,
-                          self.hr_g_sum]
+                          # self.hr_g_sum,
+                          ]
             _, _, hr_g_sum = sess.run(feed_out_g, feed_dict)
-            summary_writer.add_summary(hr_g_sum, counter)
+            # summary_writer.add_summary(hr_g_sum, counter)
             # finetune d0 with the loss of d0
-            feed_out_d = [self.discriminator_trainer, self.d_sum]
-            _, d_sum = sess.run(feed_out_d, feed_dict)
-            summary_writer.add_summary(d_sum, counter)
+            feed_out_d = [self.discriminator_trainer, 
+                            # self.d_sum,
+                            ]
+             # d_sum
+            _, = sess.run(feed_out_d, feed_dict)
+            # summary_writer.add_summary(d_sum, counter)
             # finetune g0 with the loss of g0
-            feed_out_g = [self.generator_trainer, self.g_sum]
-            _, g_sum = sess.run(feed_out_g, feed_dict)
-            summary_writer.add_summary(g_sum, counter)
+            feed_out_g = [self.generator_trainer, 
+            # self.g_sum,
+            ]
+             # g_sum
+            _, = sess.run(feed_out_g, feed_dict)
+            # summary_writer.add_summary(g_sum, counter)
         else:
             # train d1
             feed_out_d = [self.hr_discriminator_trainer,
-                          self.hr_d_sum,
+                          # self.hr_d_sum,
                           log_vars,
-                          self.hist_sum]
+                          # self.hist_sum,
+                          ]
             ret_list = sess.run(feed_out_d, feed_dict)
-            summary_writer.add_summary(ret_list[1], counter)
+            # summary_writer.add_summary(ret_list[1], counter)
             log_vals = ret_list[2]
-            summary_writer.add_summary(ret_list[3], counter)
+            # summary_writer.add_summary(ret_list[3], counter)
             # train g1
             feed_out_g = [self.hr_generator_trainer,
-                          self.hr_g_sum]
-            _, hr_g_sum = sess.run(feed_out_g, feed_dict)
-            summary_writer.add_summary(hr_g_sum, counter)
+                          # self.hr_g_sum,
+                          ]
+            # hr_g_sum
+            _,  = sess.run(feed_out_g, feed_dict)
+            # summary_writer.add_summary(hr_g_sum, counter)
 
         return log_vals
 
@@ -465,7 +481,7 @@ class CondGANTrainer(object):
                                        keep_checkpoint_every_n_hours=5)
 
                 # summary_op = tf.merge_all_summaries()
-                summary_writer = tf.train.SummaryWriter(self.log_dir,
+                summary_writer = tf.summary.FileWriter(self.log_dir,
                                                         sess.graph)
 
                 if cfg.TRAIN.FINETUNE_LR:
@@ -517,8 +533,8 @@ class CondGANTrainer(object):
 
                     img_summary, img_summary2 =\
                         self.epoch_sum_images(sess, cfg.TRAIN.NUM_COPY)
-                    summary_writer.add_summary(img_summary, counter)
-                    summary_writer.add_summary(img_summary2, counter)
+                    # summary_writer.add_summary(img_summary, counter)
+                    # summary_writer.add_summary(img_summary2, counter)
 
                     avg_log_vals = np.mean(np.array(all_log_vals), axis=0)
                     dic_logs = {}
