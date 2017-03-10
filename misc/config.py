@@ -29,7 +29,7 @@ __C.TEST.CAPTION_PATH = ''
 
 # Training options
 __C.TRAIN = edict()
-__C.TRAIN.FLAG = True
+__C.TRAIN.FLAG = True # is training
 __C.TRAIN.BATCH_SIZE = 64
 __C.TRAIN.NUM_COPY = 4
 __C.TRAIN.MAX_EPOCH = 600
@@ -41,9 +41,9 @@ __C.TRAIN.DISCRIMINATOR_LR = 2e-4
 __C.TRAIN.GENERATOR_LR = 2e-4
 __C.TRAIN.LR_DECAY_EPOCH = 50
 
-__C.TRAIN.NUM_EMBEDDING = 4
+__C.TRAIN.NUM_EMBEDDING = 4 #?
 __C.TRAIN.COND_AUGMENTATION = True
-__C.TRAIN.B_WRONG = True
+__C.TRAIN.B_WRONG = True # mix wrong caption real images
 
 __C.TRAIN.COEFF = edict()
 __C.TRAIN.COEFF.KL = 2.0

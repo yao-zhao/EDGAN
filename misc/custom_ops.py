@@ -11,126 +11,64 @@ import tensorflow as tf
 from prettytensor.pretty_tensor_class import Phase
 import numpy as np
 
-
-class conv_batch_norm(pt.VarStoreMethod):
-    """Code modification of:
-     http://stackoverflow.com/questions/33949786/how-could-i-use-batch-normalization-in-tensorflow
-     and
-     https://github.com/tensorflow/models/blob/master/inception/inception/slim/ops.py"""
-
-    def __call__(self, input_layer, epsilon=1e-5, decay=0.9, name="batch_norm",
-                 in_dim=None, phase=Phase.train):
-        shape = input_layer.shape
-        shp = in_dim or shape[-1]
-        with tf.variable_scope(name) as scope:
-            self.mean = self.variable('mean', [shp], init=tf.constant_initializer(0.), train=False)
-            self.variance = self.variable('variance', [shp], init=tf.constant_initializer(1.0), train=False)
-
-            self.gamma = self.variable("gamma", [shp], init=tf.random_normal_initializer(1., 0.02))
-            self.beta = self.variable("beta", [shp], init=tf.constant_initializer(0.))
-
-            if phase == Phase.train:
-                mean, variance = tf.nn.moments(input_layer.tensor, [0, 1, 2])
-                mean.set_shape((shp,))
-                variance.set_shape((shp,))
-
-                update_moving_mean = moving_averages.assign_moving_average(self.mean, mean, decay)
-                update_moving_variance = moving_averages.assign_moving_average(self.variance, variance, decay)
-
-                with tf.control_dependencies([update_moving_mean, update_moving_variance]):
-                    normalized_x = tf.nn.batch_norm_with_global_normalization(
-                        input_layer.tensor, mean, variance, self.beta, self.gamma, epsilon,
-                        scale_after_normalization=True)
-            else:
-                normalized_x = tf.nn.batch_norm_with_global_normalization(
-                    input_layer.tensor, self.mean, self.variance,
-                    self.beta, self.gamma, epsilon,
-                    scale_after_normalization=True)
-            return input_layer.with_tensor(normalized_x, parameters=self.vars)
-
-
-pt.Register(assign_defaults=('phase'))(conv_batch_norm)
-
-
-@pt.Register(assign_defaults=('phase'))
-class fc_batch_norm(conv_batch_norm):
-    def __call__(self, input_layer, *args, **kwargs):
-        ori_shape = input_layer.shape
-        if ori_shape[0] is None:
-            ori_shape[0] = -1
-        new_shape = [ori_shape[0], 1, 1, ori_shape[1]]
-        x = tf.reshape(input_layer.tensor, new_shape)
-        normalized_x = super(self.__class__, self).__call__(input_layer.with_tensor(x), *args, **kwargs)  # input_layer)
-        return normalized_x.reshape(ori_shape)
-
-
-def leaky_rectify(x, leakiness=0.01):
+def leaky_relu(x, leakiness=0.01):
     assert leakiness <= 1
-    ret = tf.maximum(x, leakiness * x)
-    # import ipdb; ipdb.set_trace()
-    return ret
+    return tf.maximum(x, leakiness * x)
 
+def dense_leaky(inputs, numoutput, leakiness=0.2, stddev=0.02):
+    return tf.layers.dense(inputs, numoutput,
+        activation=lambda x:leaky_relu(x, leakiness=leakiness),
+        use_bias=True,
+        kernel_initializer=tf.truncated_normal_initializer(stddev=stddev),
+        bias_initializer=tf.zeros_initializer(),
+        kernel_regularizer=None,
+        bias_regularizer=None,
+        activity_regularizer=None,
+        trainable=True, name=None, reuse=None)
 
-@pt.Register
-class custom_conv2d(pt.VarStoreMethod):
-    def __call__(self, input_layer, output_dim,
-                 k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02, in_dim=None, padding='SAME',
-                 name="conv2d"):
-        with tf.variable_scope(name):
-            w = self.variable('w', [k_h, k_w, in_dim or input_layer.shape[-1], output_dim],
-                              init=tf.truncated_normal_initializer(stddev=stddev))
-            conv = tf.nn.conv2d(input_layer.tensor, w, strides=[1, d_h, d_w, 1], padding=padding)
+def batch_norm(inputs):
+    return tf.layers.batch_normalization(inputs, axis=-1,
+        momentum=0.99, epsilon=0.001,
+        center=True, scale=True,
+        beta_initializer=tf.zeros_initializer(),
+        gamma_initializer=tf.ones_initializer(),
+        moving_mean_initializer=tf.zeros_initializer(),
+        moving_variance_initializer=tf.ones_initializer(),
+        beta_regularizer=None, gamma_regularizer=None,
+        training=False, trainable=True, name=None, reuse=None)
 
-            # biases = self.variable('biases', [output_dim], init=tf.constant_initializer(0.0))
-            # import ipdb; ipdb.set_trace()
-            # return input_layer.with_tensor(tf.nn.bias_add(conv, biases), parameters=self.vars)
-            return input_layer.with_tensor(conv, parameters=self.vars)
+def conv(inputs, numfeatures,
+        kernel_size=(3, 3), strides=(1, 1),
+        stddev=0.02, use_bias=True):
+    return tf.layers.conv2d(inputs, numfeatures, kernel_size,
+        strides=strides,
+        padding='same', data_format='channels_last',
+        dilation_rate=(1, 1), activation=None,
+        use_bias=use_bias,
+        kernel_initializer=tf.truncated_normal_initializer(stddev=stddev),
+        bias_initializer=tf.zeros_initializer(),
+        kernel_regularizer=None,
+        bias_regularizer=None,
+        activity_regularizer=None,
+        trainable=True, name=None, reuse=None)
 
+def conv_leaky(*args, **kwargs):
+    return leaky_relu(batch_norm(*args, **kwargs))
 
-@pt.Register
-class custom_deconv2d(pt.VarStoreMethod):
-    def __call__(self, input_layer, output_shape,
-                 k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
-                 name="deconv2d"):
-        output_shape[0] = input_layer.shape[0]
-        ts_output_shape = tf.pack(output_shape)
-        with tf.variable_scope(name):
-            # filter : [height, width, output_channels, in_channels]
-            w = self.variable('w', [k_h, k_w, output_shape[-1], input_layer.shape[-1]],
-                              init=tf.random_normal_initializer(stddev=stddev))
-
-            try:
-                deconv = tf.nn.conv2d_transpose(input_layer, w,
-                                                output_shape=ts_output_shape,
-                                                strides=[1, d_h, d_w, 1])
-
-            # Support for versions of TensorFlow before 0.7.0
-            except AttributeError:
-                deconv = tf.nn.deconv2d(input_layer, w, output_shape=ts_output_shape,
-                                        strides=[1, d_h, d_w, 1])
-
-            # biases = self.variable('biases', [output_shape[-1]], init=tf.constant_initializer(0.0))
-            # deconv = tf.reshape(tf.nn.bias_add(deconv, biases), [-1] + output_shape[1:])
-            deconv = tf.reshape(deconv, [-1] + output_shape[1:])
-
-            return deconv
-
-
-@pt.Register
-class custom_fully_connected(pt.VarStoreMethod):
-    def __call__(self, input_layer, output_size, scope=None, in_dim=None, stddev=0.02, bias_start=0.0):
-        shape = input_layer.shape
-        input_ = input_layer.tensor
-        try:
-            if len(shape) == 4:
-                input_ = tf.reshape(input_, tf.pack([tf.shape(input_)[0], np.prod(shape[1:])]))
-                input_.set_shape([None, np.prod(shape[1:])])
-                shape = input_.get_shape().as_list()
-
-            with tf.variable_scope(scope or "Linear"):
-                matrix = self.variable("Matrix", [in_dim or shape[1], output_size], dt=tf.float32,
-                                       init=tf.random_normal_initializer(stddev=stddev))
-                bias = self.variable("bias", [output_size], init=tf.constant_initializer(bias_start))
-                return input_layer.with_tensor(tf.matmul(input_, matrix) + bias, parameters=self.vars)
-        except Exception:
-            import ipdb; ipdb.set_trace()
+def bottleneck_stack(x, numfeatures):
+    with tf.variable_scope('branch2'):
+        with tf.variable_scope('a'):
+            x = conv(x, numfeatures/4, kernel_size=(1, 1), strides=(1, 1),
+                use_bias=False)
+            x = batch_norm(x)
+            x = tf.nn.relu(x)
+        with tf.variable_scope('b'):
+            x = conv(x, numfeatures/4, kernel_size=(3, 3), strides=(1, 1),
+                use_bias=False)
+            x = batch_norm(x)
+            x = tf.nn.relu(x)
+        with tf.variable_scope('c'):
+            x = conv(x, numfeatures, kernel_size=(3, 3), strides=(1, 1),
+                use_bias=False)
+            x = batch_norm(x)
+    return x

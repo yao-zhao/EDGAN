@@ -32,9 +32,6 @@ class CondGANTrainer(object):
                  exp_name="model",
                  ckt_logs_dir="ckt_logs",
                  ):
-        """
-        :type model: RegularizedGAN
-        """
         self.model = model
         self.dataset = dataset
         self.exp_name = exp_name
@@ -48,7 +45,13 @@ class CondGANTrainer(object):
 
         self.log_vars = []
 
-    def build_placeholder(self):
+        self.images
+        self.wrong_images
+        self.embeddings
+        self.generator_lr
+        self.discriminator_lr
+
+    def define_placeholder(self):
         '''Helper function for init_opt'''
         self.images = tf.placeholder(
             tf.float32, [self.batch_size] + self.dataset.image_shape,
@@ -72,24 +75,94 @@ class CondGANTrainer(object):
         )
 
     def sample_encoded_context(self, embeddings):
-        '''Helper function for init_opt'''
         c_mean_logsigma = self.model.generate_condition(embeddings)
         mean = c_mean_logsigma[0]
         if cfg.TRAIN.COND_AUGMENTATION:
-            # epsilon = tf.random_normal(tf.shape(mean))
             epsilon = tf.truncated_normal(tf.shape(mean))
             stddev = tf.exp(c_mean_logsigma[1])
             c = mean + stddev * epsilon
-
             kl_loss = KL_loss(c_mean_logsigma[0], c_mean_logsigma[1])
         else:
             c = mean
             kl_loss = 0
-
         return c, cfg.TRAIN.COEFF.KL * kl_loss
 
+    def define_losses(self, images, wrong_images, fake_images, embeddings):
+        real_logit = self.model.get_discriminator(images, embeddings)
+        wrong_logit = self.model.get_discriminator(wrong_images, embeddings)
+        fake_logit = self.model.get_discriminator(fake_images, embeddings)
+
+        real_d_loss =\
+            tf.nn.sigmoid_cross_entropy_with_logits(
+                labels = tf.ones_like(real_logit),
+                logits = real_logit,)
+        real_d_loss = tf.reduce_mean(real_d_loss)
+        wrong_d_loss =\
+            tf.nn.sigmoid_cross_entropy_with_logits(
+                labels = tf.zeros_like(wrong_logit),
+                logits = wrong_logit)
+        wrong_d_loss = tf.reduce_mean(wrong_d_loss)
+        fake_d_loss =\
+            tf.nn.sigmoid_cross_entropy_with_logits(
+                labels = tf.zeros_like(fake_logit),
+                logits = fake_logit)
+        fake_d_loss = tf.reduce_mean(fake_d_loss)
+
+        if cfg.TRAIN.B_WRONG:
+            discriminator_loss =\
+                real_d_loss + (wrong_d_loss + fake_d_loss) / 2.
+            self.log_vars.append(("d_loss_wrong", wrong_d_loss))
+        else:
+            discriminator_loss = real_d_loss + fake_d_loss
+        self.log_vars.append(("d_loss_real", real_d_loss))
+        self.log_vars.append(("d_loss_fake", fake_d_loss))
+
+        generator_loss = \
+            tf.nn.sigmoid_cross_entropy_with_logits(
+                labels = tf.ones_like(fake_logit),
+                logits = fake_logit)
+        generator_loss = tf.reduce_mean(generator_loss)
+
+        return discriminator_loss, generator_loss
+
+    def define_train_op(self, generator_loss, discriminator_loss):
+        '''Helper function for init_opt'''
+        all_vars = tf.trainable_variables()
+
+        g_vars = [var for var in all_vars if
+                  var.name.startswith('g_')]
+        d_vars = [var for var in all_vars if
+                  var.name.startswith('d_')]
+
+        generator_opt = tf.train.AdamOptimizer(self.generator_lr,
+                                               beta1=0.5)
+        self.generator_trainer =\
+            pt.apply_optimizer(generator_opt,
+                               losses=[generator_loss],
+                               var_list=g_vars)
+
+        discriminator_opt = tf.train.AdamOptimizer(self.discriminator_lr,
+                                                   beta1=0.5)
+        self.discriminator_trainer =\
+            pt.apply_optimizer(discriminator_opt,
+                               losses=[discriminator_loss],
+                               var_list=d_vars)
+
+        self.log_vars.append(("g_learning_rate", self.generator_lr))
+        self.log_vars.append(("d_learning_rate", self.discriminator_lr))
+
+    def define_summaries(self):
+        all_sum = {'g': [], 'd': [], 'hist': []}
+        for k, v in self.log_vars:
+            if k.startswith('g'):
+                all_sum['g'].append(tf.summary.scalar(k, v))
+            elif k.startswith('d'):
+                all_sum['d'].append(tf.summary.scalar(k, v))
+            elif k.startswith('hist'):
+                all_sum['hist'].append(tf.summary.histogram(k, v))
+
     def init_opt(self):
-        self.build_placeholder()
+        self.define_placeholder()
 
         with pt.defaults_scope(phase=pt.Phase.train):
             with tf.variable_scope("g_net"):
@@ -111,9 +184,8 @@ class CondGANTrainer(object):
             self.log_vars.append(("g_loss", generator_loss))
             self.log_vars.append(("d_loss", discriminator_loss))
 
-            # #######Total loss for build optimizers###########################
-            self.prepare_trainer(generator_loss, discriminator_loss)
-            # #######define self.g_sum, self.d_sum,....########################
+            self.define_train_op(generator_loss, discriminator_loss)
+
             self.define_summaries()
 
         with pt.defaults_scope(phase=pt.Phase.test):
@@ -130,81 +202,10 @@ class CondGANTrainer(object):
             z = tf.random_normal([self.batch_size, cfg.Z_DIM])
         self.fake_images = self.model.get_generator(tf.concat([c, z], 1))
 
-    def compute_losses(self, images, wrong_images, fake_images, embeddings):
-        real_logit = self.model.get_discriminator(images, embeddings)
-        wrong_logit = self.model.get_discriminator(wrong_images, embeddings)
-        fake_logit = self.model.get_discriminator(fake_images, embeddings)
 
-        real_d_loss =\
-            tf.nn.sigmoid_cross_entropy_with_logits(
-                                                    labels = tf.ones_like(real_logit),
-                                                    logits = real_logit,)
-        real_d_loss = tf.reduce_mean(real_d_loss)
-        wrong_d_loss =\
-            tf.nn.sigmoid_cross_entropy_with_logits(
-                                                    labels = tf.zeros_like(wrong_logit),
-                                                    logits = wrong_logit)
-        wrong_d_loss = tf.reduce_mean(wrong_d_loss)
-        fake_d_loss =\
-            tf.nn.sigmoid_cross_entropy_with_logits(
-                                                    labels = tf.zeros_like(fake_logit),
-                                                    logits = fake_logit)
-        fake_d_loss = tf.reduce_mean(fake_d_loss)
-        if cfg.TRAIN.B_WRONG:
-            discriminator_loss =\
-                real_d_loss + (wrong_d_loss + fake_d_loss) / 2.
-            self.log_vars.append(("d_loss_wrong", wrong_d_loss))
-        else:
-            discriminator_loss = real_d_loss + fake_d_loss
-        self.log_vars.append(("d_loss_real", real_d_loss))
-        self.log_vars.append(("d_loss_fake", fake_d_loss))
 
-        generator_loss = \
-            tf.nn.sigmoid_cross_entropy_with_logits(
-                                                    labels = tf.ones_like(fake_logit),
-                                                    logits = fake_logit)
-        generator_loss = tf.reduce_mean(generator_loss)
 
-        return discriminator_loss, generator_loss
 
-    def prepare_trainer(self, generator_loss, discriminator_loss):
-        '''Helper function for init_opt'''
-        all_vars = tf.trainable_variables()
-
-        g_vars = [var for var in all_vars if
-                  var.name.startswith('g_')]
-        d_vars = [var for var in all_vars if
-                  var.name.startswith('d_')]
-
-        generator_opt = tf.train.AdamOptimizer(self.generator_lr,
-                                               beta1=0.5)
-        self.generator_trainer =\
-            pt.apply_optimizer(generator_opt,
-                               losses=[generator_loss],
-                               var_list=g_vars)
-        discriminator_opt = tf.train.AdamOptimizer(self.discriminator_lr,
-                                                   beta1=0.5)
-        self.discriminator_trainer =\
-            pt.apply_optimizer(discriminator_opt,
-                               losses=[discriminator_loss],
-                               var_list=d_vars)
-        self.log_vars.append(("g_learning_rate", self.generator_lr))
-        self.log_vars.append(("d_learning_rate", self.discriminator_lr))
-
-    def define_summaries(self):
-        '''Helper function for init_opt'''
-        all_sum = {'g': [], 'd': [], 'hist': []}
-        for k, v in self.log_vars:
-            if k.startswith('g'):
-                all_sum['g'].append(tf.summary.scalar(k, v))
-            elif k.startswith('d'):
-                all_sum['d'].append(tf.summary.scalar(k, v))
-            elif k.startswith('hist'):
-                all_sum['hist'].append(tf.summary.histogram(k, v))
-
-        # self.g_sum = tf.merge_summary(all_sum['g'])
-        # self.d_sum = tf.merge_summary(all_sum['d'])
-        # self.hist_sum = tf.merge_summary(all_sum['hist'])
 
     def visualize_one_superimage(self, img_var, images, rows, filename):
         stacked_img = []
@@ -216,20 +217,19 @@ class CondGANTrainer(object):
             # each rows is 1realimage +10_fakeimage
             stacked_img.append(tf.concat(row_img, 1))
         imgs = tf.expand_dims(tf.concat(stacked_img, 0), 0)
-        current_img_summary = tf.summary.image(filename, imgs)
-        return current_img_summary, imgs
+        tf.summary.image(filename, imgs)
+        return imgs
 
     def visualization(self, n):
-        fake_sum_train, superimage_train = \
+        superimage_train = \
             self.visualize_one_superimage(self.fake_images[:n * n],
                                           self.images[:n * n],
                                           n, "train")
-        fake_sum_test, superimage_test = \
+        superimage_test = \
             self.visualize_one_superimage(self.fake_images[n * n:2 * n * n],
                                           self.images[n * n:2 * n * n],
                                           n, "test")
         self.superimages = tf.concat([superimage_train, superimage_test], 0)
-        # self.image_summary = tf.merge_summary([fake_sum_train, fake_sum_test])
 
     def preprocess(self, x, n):
         # make sure every row with n column have the same embeddings
@@ -260,8 +260,7 @@ class CondGANTrainer(object):
             embeddings = np.concatenate([embeddings, embeddings_pad], axis=0)
         feed_dict = {self.images: images,
                      self.embeddings: embeddings}
-        gen_samples, img_summary =\
-            sess.run([self.superimages, self.image_summary], feed_dict)
+        gen_samples = sess.run([self.superimages], feed_dict)
 
         # save images generated for train and test captions
         scipy.misc.imsave('%s/train.jpg' % (self.log_dir), gen_samples[0])
@@ -278,8 +277,6 @@ class CondGANTrainer(object):
         # pfi_train.close()
         pfi_test.close()
 
-        return img_summary
-
     def build_model(self, sess):
         self.init_opt()
         sess.run(tf.initialize_all_variables())
@@ -287,10 +284,6 @@ class CondGANTrainer(object):
         if len(self.model_path) > 0:
             print("Reading model parameters from %s" % self.model_path)
             restore_vars = tf.all_variables()
-            # all_vars = tf.all_variables()
-            # restore_vars = [var for var in all_vars if
-            #                 var.name.startswith('g_') or
-            #                 var.name.startswith('d_')]
             saver = tf.train.Saver(restore_vars)
             saver.restore(sess, self.model_path)
 
@@ -309,9 +302,8 @@ class CondGANTrainer(object):
             with tf.device("/gpu:%d" % cfg.GPU_ID):
                 counter = self.build_model(sess)
                 saver = tf.train.Saver(tf.all_variables(),
-                                       keep_checkpoint_every_n_hours=2)
+                                       keep_checkpoint_every_n_hours=1)
 
-                # summary_op = tf.merge_all_summaries()
                 tf.summary.merge_all()
                 summary_writer = tf.summary.FileWriter(self.log_dir,
                                                         sess.graph)
@@ -334,9 +326,9 @@ class CondGANTrainer(object):
                 for epoch in range(epoch_start, self.max_epoch):
                     widgets = ["epoch #%d|" % epoch,
                                Percentage(), Bar(), ETA()]
-                    pbar = ProgressBar(maxval=updates_per_epoch,
+                    progressbar = ProgressBar(maxval=updates_per_epoch,
                                        widgets=widgets)
-                    pbar.start()
+                    progressbar.start()
 
                     if epoch % lr_decay_step == 0 and epoch != 0:
                         generator_lr *= 0.5
@@ -344,7 +336,7 @@ class CondGANTrainer(object):
 
                     all_log_vals = []
                     for i in range(updates_per_epoch):
-                        pbar.update(i)
+                        progressbar.update(i)
                         # training d
                         images, wrong_images, embeddings, _, _ =\
                             self.dataset.train.next_batch(self.batch_size,
@@ -357,23 +349,12 @@ class CondGANTrainer(object):
                                      }
                         # train d
                         feed_out = [self.discriminator_trainer,
-                                    # self.d_sum,
-                                    # self.hist_sum,
                                     log_vars]
-                        # d_sum, hist_sum, 
-                        _, log_vals = sess.run(feed_out,
-                                                                feed_dict)
-                        # summary_writer.add_summary(d_sum, counter)
-                        # summary_writer.add_summary(hist_sum, counter)
+                        _, log_vals = sess.run(feed_out, feed_dict)
                         all_log_vals.append(log_vals)
                         # train g
-                        feed_out = [self.generator_trainer,
-                                    # self.g_sum,
-                                    ]
-                        # g_sum 
-                        _ = sess.run(feed_out,
-                                            feed_dict)
-                        # summary_writer.add_summary(g_sum, counter)
+                        feed_out = [self.generator_trainer]
+                        sess.run(feed_out, feed_dict)
                         # save checkpoint
                         counter += 1
                         if counter % self.snapshot_interval == 0:
@@ -391,7 +372,6 @@ class CondGANTrainer(object):
                     dic_logs = {}
                     for k, v in zip(log_keys, avg_log_vals):
                         dic_logs[k] = v
-                        # print(k, v)
 
                     log_line = "; ".join("%s: %s" %
                                          (str(k), str(dic_logs[k]))
@@ -401,8 +381,9 @@ class CondGANTrainer(object):
                     if np.any(np.isnan(avg_log_vals)):
                         raise ValueError("NaN detected!")
 
+
     def save_super_images(self, images, sample_batchs, filenames,
-                          sentenceID, save_dir, subset):
+                      sentenceID, save_dir, subset):
         # batch_size samples for each embedding
         numSamples = len(sample_batchs)
         for j in range(len(filenames)):
@@ -440,7 +421,6 @@ class CondGANTrainer(object):
                 self.save_super_images(images, samples_batchs,
                                        filenames, i, save_dir,
                                        subset)
-
             count += self.batch_size
 
     def evaluate(self):
