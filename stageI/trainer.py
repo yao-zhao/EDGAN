@@ -1,7 +1,6 @@
 from __future__ import division
 from __future__ import print_function
 
-import prettytensor as pt
 import tensorflow as tf
 import numpy as np
 import scipy.misc
@@ -9,7 +8,6 @@ import os
 import sys
 from six.moves import range
 from progressbar import ETA, Bar, Percentage, ProgressBar
-
 
 from misc.config import cfg
 from misc.utils import mkdir_p
@@ -24,14 +22,9 @@ def KL_loss(mu, log_sigma):
         loss = tf.reduce_mean(loss)
         return loss
 
-
 class CondGANTrainer(object):
-    def __init__(self,
-                 model,
-                 dataset=None,
-                 exp_name="model",
-                 ckt_logs_dir="ckt_logs",
-                 ):
+    def __init__(self, model, dataset=None, exp_name="model",
+        ckt_logs_dir="ckt_logs",):
         self.model = model
         self.dataset = dataset
         self.exp_name = exp_name
@@ -45,14 +38,7 @@ class CondGANTrainer(object):
 
         self.log_vars = []
 
-        self.images
-        self.wrong_images
-        self.embeddings
-        self.generator_lr
-        self.discriminator_lr
-
     def define_placeholder(self):
-        '''Helper function for init_opt'''
         self.images = tf.placeholder(
             tf.float32, [self.batch_size] + self.dataset.image_shape,
             name='real_images')
@@ -88,9 +74,10 @@ class CondGANTrainer(object):
         return c, cfg.TRAIN.COEFF.KL * kl_loss
 
     def define_losses(self, images, wrong_images, fake_images, embeddings):
-        real_logit = self.model.get_discriminator(images, embeddings)
-        wrong_logit = self.model.get_discriminator(wrong_images, embeddings)
-        fake_logit = self.model.get_discriminator(fake_images, embeddings)
+        discriminator = self.model.get_discriminator()
+        real_logit = discriminator(images, embeddings)
+        wrong_logit = discriminator(wrong_images, embeddings)
+        fake_logit = discriminator(fake_images, embeddings)
 
         real_d_loss =\
             tf.nn.sigmoid_cross_entropy_with_logits(
@@ -126,7 +113,6 @@ class CondGANTrainer(object):
         return discriminator_loss, generator_loss
 
     def define_train_op(self, generator_loss, discriminator_loss):
-        '''Helper function for init_opt'''
         all_vars = tf.trainable_variables()
 
         g_vars = [var for var in all_vars if
@@ -134,19 +120,17 @@ class CondGANTrainer(object):
         d_vars = [var for var in all_vars if
                   var.name.startswith('d_')]
 
-        generator_opt = tf.train.AdamOptimizer(self.generator_lr,
+        g_opt = tf.train.AdamOptimizer(self.generator_lr,
                                                beta1=0.5)
-        self.generator_trainer =\
-            pt.apply_optimizer(generator_opt,
-                               losses=[generator_loss],
-                               var_list=g_vars)
+        g_grad = g_opt.compute_gradients(generator_loss)
+        # tf.clip_by_value(t, clip_value_min, clip_value_max, name=None)
+        self.generator_trainer = g_opt.apply_gradients(g_grad)
 
-        discriminator_opt = tf.train.AdamOptimizer(self.discriminator_lr,
+        d_opt = tf.train.AdamOptimizer(self.discriminator_lr,
                                                    beta1=0.5)
-        self.discriminator_trainer =\
-            pt.apply_optimizer(discriminator_opt,
-                               losses=[discriminator_loss],
-                               var_list=d_vars)
+        d_grad = d_opt.compute_gradients(generator_loss)
+        # tf.clip_by_value(t, clip_value_min, clip_value_max, name=None)
+        self.discriminator_trainer= d_opt.apply_gradients(g_grad)
 
         self.log_vars.append(("g_learning_rate", self.generator_lr))
         self.log_vars.append(("d_learning_rate", self.discriminator_lr))
@@ -164,35 +148,31 @@ class CondGANTrainer(object):
     def init_opt(self):
         self.define_placeholder()
 
-        with pt.defaults_scope(phase=pt.Phase.train):
-            with tf.variable_scope("g_net"):
-                # ####get output from G network################################
-                c, kl_loss = self.sample_encoded_context(self.embeddings)
-                z = tf.random_normal([self.batch_size, cfg.Z_DIM])
-                self.log_vars.append(("hist_c", c))
-                self.log_vars.append(("hist_z", z))
-                fake_images = self.model.get_generator(tf.concat([c, z], 1))
+        with tf.variable_scope("g_net"):
+            # ####get output from G network################################
+            c, kl_loss = self.sample_encoded_context(self.embeddings)
+            z = tf.random_normal([self.batch_size, cfg.Z_DIM])
+            self.log_vars.append(("hist_c", c))
+            self.log_vars.append(("hist_z", z))
+            self.model.is_training = cfg.TRAIN.FLAG
+            generator = self.model.get_generator()
+            fake_images = generator(tf.concat([c, z], 1))
 
-            # ####get discriminator_loss and generator_loss ###################
+        # ####get discriminator_loss and generator_loss ###################
+        with tf.variable_scope("d_net"):
             discriminator_loss, generator_loss =\
-                self.compute_losses(self.images,
+                self.define_losses(self.images,
                                     self.wrong_images,
                                     fake_images,
                                     self.embeddings)
-            generator_loss += kl_loss
-            self.log_vars.append(("g_loss_kl_loss", kl_loss))
-            self.log_vars.append(("g_loss", generator_loss))
-            self.log_vars.append(("d_loss", discriminator_loss))
+        generator_loss += kl_loss
+        self.log_vars.append(("g_loss_kl_loss", kl_loss))
+        self.log_vars.append(("g_loss", generator_loss))
+        self.log_vars.append(("d_loss", discriminator_loss))
 
-            self.define_train_op(generator_loss, discriminator_loss)
+        self.define_train_op(generator_loss, discriminator_loss)
 
-            self.define_summaries()
-
-        with pt.defaults_scope(phase=pt.Phase.test):
-            with tf.variable_scope("g_net", reuse=True):
-                self.sampler()
-            self.visualization(cfg.TRAIN.NUM_COPY)
-            print("success")
+        self.define_summaries()
 
     def sampler(self):
         c, _ = self.sample_encoded_context(self.embeddings)
@@ -201,11 +181,6 @@ class CondGANTrainer(object):
         else:
             z = tf.random_normal([self.batch_size, cfg.Z_DIM])
         self.fake_images = self.model.get_generator(tf.concat([c, z], 1))
-
-
-
-
-
 
     def visualize_one_superimage(self, img_var, images, rows, filename):
         stacked_img = []
@@ -279,7 +254,7 @@ class CondGANTrainer(object):
 
     def build_model(self, sess):
         self.init_opt()
-        sess.run(tf.initialize_all_variables())
+        sess.run(tf.global_variables_initializer())
 
         if len(self.model_path) > 0:
             print("Reading model parameters from %s" % self.model_path)
@@ -302,9 +277,9 @@ class CondGANTrainer(object):
             with tf.device("/gpu:%d" % cfg.GPU_ID):
                 counter = self.build_model(sess)
                 saver = tf.train.Saver(tf.all_variables(),
-                                       keep_checkpoint_every_n_hours=1)
+                    keep_checkpoint_every_n_hours=1)
 
-                tf.summary.merge_all()
+                merged = tf.summary.merge_all()
                 summary_writer = tf.summary.FileWriter(self.log_dir,
                                                         sess.graph)
 
@@ -315,13 +290,11 @@ class CondGANTrainer(object):
                     if k in keys:
                         log_vars.append(v)
                         log_keys.append(k)
-                        # print(k, v)
+
                 generator_lr = cfg.TRAIN.GENERATOR_LR
                 discriminator_lr = cfg.TRAIN.DISCRIMINATOR_LR
-                num_embedding = cfg.TRAIN.NUM_EMBEDDING
-                lr_decay_step = cfg.TRAIN.LR_DECAY_EPOCH
-                number_example = self.dataset.train._num_examples
-                updates_per_epoch = int(number_example / self.batch_size)
+                updates_per_epoch = int(self.dataset.train._num_examples /\
+                     self.batch_size)
                 epoch_start = int(counter / updates_per_epoch)
                 for epoch in range(epoch_start, self.max_epoch):
                     widgets = ["epoch #%d|" % epoch,
@@ -330,7 +303,7 @@ class CondGANTrainer(object):
                                        widgets=widgets)
                     progressbar.start()
 
-                    if epoch % lr_decay_step == 0 and epoch != 0:
+                    if epoch % cfg.TRAIN.LR_DECAY_EPOCH == 0 and epoch != 0:
                         generator_lr *= 0.5
                         discriminator_lr *= 0.5
 
@@ -340,7 +313,7 @@ class CondGANTrainer(object):
                         # training d
                         images, wrong_images, embeddings, _, _ =\
                             self.dataset.train.next_batch(self.batch_size,
-                                                          num_embedding)
+                                cfg.TRAIN.NUM_EMBEDDING)
                         feed_dict = {self.images: images,
                                      self.wrong_images: wrong_images,
                                      self.embeddings: embeddings,
@@ -383,7 +356,7 @@ class CondGANTrainer(object):
 
 
     def save_super_images(self, images, sample_batchs, filenames,
-                      sentenceID, save_dir, subset):
+        sentenceID, save_dir, subset):
         # batch_size samples for each embedding
         numSamples = len(sample_batchs)
         for j in range(len(filenames)):

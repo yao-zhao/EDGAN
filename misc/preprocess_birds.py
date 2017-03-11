@@ -27,7 +27,8 @@ def load_filenames(data_dir):
     with open(filepath, 'rb') as f:
         filenames = pickle.load(f)
     print('Load filenames from: %s (%d)' % (filepath, len(filenames)))
-    return filenames
+    # only load a little bit
+    return filenames[:200]
 
 
 def load_bbox(data_dir):

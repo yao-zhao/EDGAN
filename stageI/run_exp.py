@@ -13,7 +13,7 @@ from stageI.trainer import CondGANTrainer
 from misc.utils import mkdir_p
 from misc.config import cfg, cfg_from_file
 
-
+#%%
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a GAN network')
     parser.add_argument('--cfg', dest='cfg_file',
@@ -49,6 +49,7 @@ if __name__ == "__main__":
     else:
         s_tmp = cfg.TRAIN.PRETRAINED_MODEL
         ckt_logs_dir = s_tmp[:s_tmp.find('.ckpt')]
+    #%%
 
     model = CondGAN(
         image_shape=dataset.image_shape
