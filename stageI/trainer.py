@@ -282,6 +282,8 @@ class CondGANTrainer(object):
                 merged = tf.summary.merge_all()
                 summary_writer = tf.summary.FileWriter(self.log_dir,
                                                         sess.graph)
+                # summary = sess.run(merged)
+                # summary_writer.add_summary(summary, 1)
 
                 keys = ["d_loss", "g_loss"]
                 log_vars = []
@@ -338,7 +340,7 @@ class CondGANTrainer(object):
                             fn = saver.save(sess, snapshot_path)
                             print("Model saved in file: %s" % fn)
 
-                    img_sum = self.epoch_sum_images(sess, cfg.TRAIN.NUM_COPY)
+                    # img_sum = self.epoch_sum_images(sess, cfg.TRAIN.NUM_COPY)
                     # summary_writer.add_summary(img_sum, counter)
 
                     avg_log_vals = np.mean(np.array(all_log_vals), axis=0)
