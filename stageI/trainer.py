@@ -229,7 +229,7 @@ class CondGANTrainer(object):
                 x[i * n + j] = x[i * n]
         return x
 
-    def epoch_sum_images(self, sess, n):
+    def epoch_sum_images(self, sess, n, epoch):
         images_train, _, embeddings_train, captions_train, _ =\
             self.dataset.train.next_batch(n * n, cfg.TRAIN.NUM_EMBEDDING)
         images_train = self.preprocess(images_train, n)
@@ -255,11 +255,13 @@ class CondGANTrainer(object):
             sess.run([self.superimages, self.image_summary], feed_dict)
 
         # save images generated for train and test captions
-        scipy.misc.imsave('%s/train.jpg' % (self.log_dir), gen_samples[0])
-        scipy.misc.imsave('%s/test.jpg' % (self.log_dir), gen_samples[1])
+        scipy.misc.imsave('%s/train_%d.jpg' % (self.log_dir, epoch),
+            gen_samples[0])
+        scipy.misc.imsave('%s/test_%d.jpg' % (self.log_dir, epoch),
+            gen_samples[1])
 
         # pfi_train = open(self.log_dir + "/train.txt", "w")
-        pfi_test = open(self.log_dir + "/test.txt", "w")
+        pfi_test = open(self.log_dir + "/test_%d.txt" % (epoch), "w")
         for row in range(n):
             # pfi_train.write('\n***row %d***\n' % row)
             # pfi_train.write(captions_train[row * n])
@@ -308,7 +310,7 @@ class CondGANTrainer(object):
         if np.any(np.isnan(avg_log_vals)):
             raise ValueError("NaN detected!")
 
-    def save_model(self, sess, counter):
+    def save_model(self, sess, saver, counter):
         if counter % self.snapshot_interval == 0:
             snapshot_path = "%s/%s_%s.ckpt" %\
                              (self.checkpoint_dir,
@@ -377,9 +379,10 @@ class CondGANTrainer(object):
                         summary_writer.add_summary(hist_sum, counter)
                         # save checkpoint
                         counter += 1
-                        self.save_model(sess, counter)
+                        self.save_model(sess, saver, counter)
 
-                    img_sum = self.epoch_sum_images(sess, cfg.TRAIN.NUM_COPY)
+                    img_sum = self.epoch_sum_images(\
+                        sess, cfg.TRAIN.NUM_COPY, epoch)
                     summary_writer.add_summary(img_sum, counter)
                     self.display_loss(epoch, log_keys, all_log_vals)
 
