@@ -60,8 +60,8 @@ class CondGAN(common_ops):
             node5 = tf.nn.relu(self.batch_norm(node5))
         return tf.nn.tanh(node5)
 
-    def get_generator(self):
-        return tf.make_template('g_net', self.g_generator)
+    # def get_generator(self):
+    #     return tf.make_template('g_net', self.g_generator)
 
     # d-net---------------------------------------------------------------------
     def d_embed_context(self, text_var):

@@ -11,7 +11,7 @@ from misc.config import cfg
 
 class common_ops(object):
     def __init__(self):
-        self.is_training=True
+        self.is_training = True
 
     def leaky_relu(self, x, leakiness=0.01):
         assert leakiness <= 1
@@ -52,7 +52,7 @@ class common_ops(object):
 
     def conv(self, inputs, numfeatures,
             kernel_size=(3, 3), strides=(1, 1),
-            stddev=0.02, use_bias=True):
+            stddev=0.02, use_bias=False):
         return tf.layers.conv2d(inputs, numfeatures, kernel_size,
             strides=strides,
             padding='same', data_format='channels_last',

@@ -55,17 +55,23 @@ class CondGANTrainer(object):
         )
 
     def sample_encoded_context(self, mean, logsigma):
-        with tf.variable_scope('g_sample'):
+        with tf.variable_scope('g_sample_cond'):
             if cfg.TRAIN.COND_AUGMENTATION:
-                epsilon = tf.truncated_normal(tf.shape(mean))
-                stddev = tf.exp(logsigma)
+                epsilon = tf.truncated_normal(tf.shape(mean), name='epsilon')
+                stddev = tf.exp(logsigma, name='sigma')
                 c = mean + stddev * epsilon
             else:
                 c = mean
-            z = tf.random_normal([self.batch_size, cfg.Z_DIM])
             self.log_vars.append(("hist_c", c))
-            self.log_vars.append(("hist_z", z))
-            c_z_concat = tf.concat([c, z], 1)
+        return c
+
+    def sample_background(self, c, sample_background=True):
+        if sample_background:
+            z = tf.random_normal([self.batch_size, cfg.Z_DIM])
+        else:
+            z = tf.zeros([self.batch_size, cfg.Z_DIM])
+        self.log_vars.append(("hist_z", z))
+        c_z_concat = tf.concat([c, z], 1)
         return c_z_concat
 
     def get_kl_loss(self, mu, log_sigma):
@@ -127,13 +133,15 @@ class CondGANTrainer(object):
             name='g_optimizer')
         g_grad = g_opt.compute_gradients(generator_loss, var_list=g_vars)
         # tf.clip_by_value(t, clip_value_min, clip_value_max, name=None)
-        self.generator_trainer = g_opt.apply_gradients(g_grad)
+        self.generator_trainer = g_opt.apply_gradients(g_grad,
+            name='g_grad_apply')
 
         d_opt = tf.train.AdamOptimizer(self.discriminator_lr, beta1=0.5,
             name='d_optimizer')
         d_grad = d_opt.compute_gradients(discriminator_loss, var_list=d_vars)
         # tf.clip_by_value(t, clip_value_min, clip_value_max, name=None)
-        self.discriminator_trainer= d_opt.apply_gradients(d_grad)
+        self.discriminator_trainer= d_opt.apply_gradients(d_grad,
+            name='d_grad_apply')
 
         self.log_vars.append(("g_learning_rate", self.generator_lr))
         self.log_vars.append(("d_learning_rate", self.discriminator_lr))
@@ -154,10 +162,21 @@ class CondGANTrainer(object):
     def initialize(self):
         self.define_placeholder()
         mean, logsigma = self.model.generate_condition(self.embeddings)
+        c = self.sample_encoded_context(mean, logsigma)
         kl_loss = self.get_kl_loss(mean, logsigma)
-        self.model.is_training = cfg.TRAIN.FLAG
-        generator = self.model.get_generator()
-        fake_images = generator(self.sample_encoded_context(mean, logsigma))
+        # fake images for train
+        with tf.variable_scope('g_sample_bg_train'):
+            c_z_concat_train = self.sample_background(c)
+        with tf.variable_scope('g_net'):
+            self.model.is_training = True
+            fake_images = self.model.g_generator(c_z_concat_train)
+        # fake images for show
+        with tf.variable_scope('g_sample_bg_test'):
+            c_z_concat_test = self.sample_background(c, cfg.TRAIN.FLAG)
+        with tf.variable_scope('g_net', reuse=True):
+            self.model.is_training = False
+            self.fake_images = self.model.g_generator(c_z_concat_test)
+
         discriminator = self.model.get_discriminator()
         real_logit = discriminator(self.images, self.embeddings)
         wrong_logit = discriminator(self.wrong_images, self.embeddings)
@@ -169,8 +188,9 @@ class CondGANTrainer(object):
         self.log_vars.append(("d_loss", discriminator_loss))
         self.define_train_op(generator_loss, discriminator_loss)
         self.define_summaries()
+        self.visualization(cfg.TRAIN.NUM_COPY)
 
-    def sampler(self):
+    def sampler(self, mean, logsigma):
         c, _ = self.sample_encoded_context(self.embeddings)
         if cfg.TRAIN.FLAG:
             z = tf.zeros([self.batch_size, cfg.Z_DIM])  # Expect similar BGs
@@ -188,19 +208,19 @@ class CondGANTrainer(object):
             # each rows is 1realimage +10_fakeimage
             stacked_img.append(tf.concat(row_img, 1))
         imgs = tf.expand_dims(tf.concat(stacked_img, 0), 0)
-        tf.summary.image(filename, imgs)
-        return imgs
+        return tf.summary.image(filename, imgs), imgs
 
     def visualization(self, n):
-        superimage_train = \
+        fake_sum_train, superimage_train = \
             self.visualize_one_superimage(self.fake_images[:n * n],
                                           self.images[:n * n],
                                           n, "train")
-        superimage_test = \
+        fake_sum_test, superimage_test = \
             self.visualize_one_superimage(self.fake_images[n * n:2 * n * n],
                                           self.images[n * n:2 * n * n],
                                           n, "test")
         self.superimages = tf.concat([superimage_train, superimage_test], 0)
+        self.image_summary = tf.summary.merge([fake_sum_train, fake_sum_test])
 
     def preprocess(self, x, n):
         # make sure every row with n column have the same embeddings
@@ -231,7 +251,8 @@ class CondGANTrainer(object):
             embeddings = np.concatenate([embeddings, embeddings_pad], axis=0)
         feed_dict = {self.images: images,
                      self.embeddings: embeddings}
-        gen_samples = sess.run([self.superimages], feed_dict)
+        gen_samples, img_summary =\
+            sess.run([self.superimages, self.image_summary], feed_dict)
 
         # save images generated for train and test captions
         scipy.misc.imsave('%s/train.jpg' % (self.log_dir), gen_samples[0])
@@ -247,6 +268,7 @@ class CondGANTrainer(object):
             pfi_test.write(captions_test[row * n])
         # pfi_train.close()
         pfi_test.close()
+        return img_summary
 
     def load_model(self, sess):
         if len(self.model_path) > 0:
@@ -357,8 +379,8 @@ class CondGANTrainer(object):
                         counter += 1
                         self.save_model(sess, counter)
 
-                    # img_sum = self.epoch_sum_images(sess, cfg.TRAIN.NUM_COPY)
-                    # summary_writer.add_summary(img_sum, counter)
+                    img_sum = self.epoch_sum_images(sess, cfg.TRAIN.NUM_COPY)
+                    summary_writer.add_summary(img_sum, counter)
                     self.display_loss(epoch, log_keys, all_log_vals)
 
     def save_super_images(self, images, sample_batchs, filenames,
