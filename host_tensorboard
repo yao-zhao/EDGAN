@@ -1,1 +1,1 @@
-python2 -m tensorflow.tensorboard --logdir='~/iGAN/birds/'
+python2 -m tensorflow.tensorboard --logdir='~/iGAN/ckt_logs/birds/'

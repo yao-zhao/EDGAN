@@ -23,12 +23,12 @@ class CondGAN(common_ops):
 
     # g-net --------------------------------------------------------------------
     def generate_condition(self, text_var):
-        with tf.variable_scope('g_embed'):
+        with tf.variable_scope('g_cond'):
             text_var = tf.reshape(text_var, [self.batch_size, -1])
             conditions = self.dense_leaky(text_var, self.ef_dim * 2)
             mean = conditions[:, :self.ef_dim]
             log_sigma = conditions[:, self.ef_dim:]
-            return [mean, log_sigma]
+            return mean, log_sigma
 
     def g_generator(self, z_var):
         with tf.variable_scope('node0'):

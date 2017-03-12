@@ -15,12 +15,7 @@ from misc.utils import mkdir_p
 TINY = 1e-8
 
 
-# reduce_mean normalize also the dimension of the embeddings
-def KL_loss(mu, log_sigma):
-    with tf.name_scope("KL_divergence"):
-        loss = -log_sigma + .5 * (-1 + tf.exp(2. * log_sigma) + tf.square(mu))
-        loss = tf.reduce_mean(loss)
-        return loss
+
 
 class CondGANTrainer(object):
     def __init__(self, model, dataset=None, exp_name="model",
@@ -50,7 +45,6 @@ class CondGANTrainer(object):
             tf.float32, [self.batch_size] + self.dataset.embedding_shape,
             name='conditional_embeddings'
         )
-
         self.generator_lr = tf.placeholder(
             tf.float32, [],
             name='generator_learning_rate'
@@ -60,56 +54,65 @@ class CondGANTrainer(object):
             name='discriminator_learning_rate'
         )
 
-    def sample_encoded_context(self, embeddings):
-        c_mean_logsigma = self.model.generate_condition(embeddings)
-        mean = c_mean_logsigma[0]
-        if cfg.TRAIN.COND_AUGMENTATION:
-            epsilon = tf.truncated_normal(tf.shape(mean))
-            stddev = tf.exp(c_mean_logsigma[1])
-            c = mean + stddev * epsilon
-            kl_loss = KL_loss(c_mean_logsigma[0], c_mean_logsigma[1])
-        else:
-            c = mean
-            kl_loss = 0
-        return c, cfg.TRAIN.COEFF.KL * kl_loss
+    def sample_encoded_context(self, mean, logsigma):
+        with tf.variable_scope('g_sample'):
+            if cfg.TRAIN.COND_AUGMENTATION:
+                epsilon = tf.truncated_normal(tf.shape(mean))
+                stddev = tf.exp(logsigma)
+                c = mean + stddev * epsilon
+            else:
+                c = mean
+            z = tf.random_normal([self.batch_size, cfg.Z_DIM])
+            self.log_vars.append(("hist_c", c))
+            self.log_vars.append(("hist_z", z))
+            c_z_concat = tf.concat([c, z], 1)
+        return c_z_concat
 
-    def define_losses(self, images, wrong_images, fake_images, embeddings):
-        discriminator = self.model.get_discriminator()
-        real_logit = discriminator(images, embeddings)
-        wrong_logit = discriminator(wrong_images, embeddings)
-        fake_logit = discriminator(fake_images, embeddings)
+    def get_kl_loss(self, mu, log_sigma):
+        with tf.name_scope("KL_divergence"):
+            if cfg.TRAIN.COND_AUGMENTATION:
+                loss = -log_sigma + .5 * (-1 + tf.exp(2. * log_sigma) \
+                    + tf.square(mu))
+                loss = tf.reduce_mean(loss) * cfg.TRAIN.COEFF.KL
+            else:
+                loss = 0
+            return loss
 
-        real_d_loss =\
-            tf.nn.sigmoid_cross_entropy_with_logits(
-                labels = tf.ones_like(real_logit),
-                logits = real_logit,)
-        real_d_loss = tf.reduce_mean(real_d_loss)
-        wrong_d_loss =\
-            tf.nn.sigmoid_cross_entropy_with_logits(
-                labels = tf.zeros_like(wrong_logit),
-                logits = wrong_logit)
-        wrong_d_loss = tf.reduce_mean(wrong_d_loss)
-        fake_d_loss =\
-            tf.nn.sigmoid_cross_entropy_with_logits(
-                labels = tf.zeros_like(fake_logit),
-                logits = fake_logit)
-        fake_d_loss = tf.reduce_mean(fake_d_loss)
-
-        if cfg.TRAIN.B_WRONG:
-            discriminator_loss =\
-                real_d_loss + (wrong_d_loss + fake_d_loss) / 2.
-            self.log_vars.append(("d_loss_wrong", wrong_d_loss))
-        else:
-            discriminator_loss = real_d_loss + fake_d_loss
-        self.log_vars.append(("d_loss_real", real_d_loss))
-        self.log_vars.append(("d_loss_fake", fake_d_loss))
-
-        generator_loss = \
-            tf.nn.sigmoid_cross_entropy_with_logits(
-                labels = tf.ones_like(fake_logit),
-                logits = fake_logit)
-        generator_loss = tf.reduce_mean(generator_loss)
-
+    def define_losses(self, real_logit, wrong_logit, fake_logit, kl_loss):
+        with tf.variable_scope('d_loss'):
+            with tf.variable_scope('real_d_loss'):
+                real_d_loss =\
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels = tf.ones_like(real_logit),
+                        logits = real_logit,)
+                real_d_loss = tf.reduce_mean(real_d_loss)
+            with tf.variable_scope('wrong_d_loss'):
+                wrong_d_loss =\
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels = tf.zeros_like(wrong_logit),
+                        logits = wrong_logit)
+                wrong_d_loss = tf.reduce_mean(wrong_d_loss)
+            with tf.variable_scope('fake_d_loss'):
+                fake_d_loss =\
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels = tf.zeros_like(fake_logit),
+                        logits = fake_logit)
+                fake_d_loss = tf.reduce_mean(fake_d_loss)
+            if cfg.TRAIN.B_WRONG:
+                discriminator_loss =\
+                    real_d_loss + (wrong_d_loss + fake_d_loss) / 2.
+                self.log_vars.append(("d_loss_wrong", wrong_d_loss))
+            else:
+                discriminator_loss = real_d_loss + fake_d_loss
+            self.log_vars.append(("d_loss_real", real_d_loss))
+            self.log_vars.append(("d_loss_fake", fake_d_loss))
+        with tf.variable_scope('g_loss'):
+            generator_loss = \
+                tf.nn.sigmoid_cross_entropy_with_logits(
+                    labels = tf.ones_like(fake_logit),
+                    logits = fake_logit)
+            generator_loss = tf.reduce_mean(generator_loss)
+            generator_loss += kl_loss
         return discriminator_loss, generator_loss
 
     def define_train_op(self, generator_loss, discriminator_loss):
@@ -120,17 +123,17 @@ class CondGANTrainer(object):
         d_vars = [var for var in all_vars if
                   var.name.startswith('d_')]
 
-        g_opt = tf.train.AdamOptimizer(self.generator_lr,
-                                               beta1=0.5)
-        g_grad = g_opt.compute_gradients(generator_loss)
+        g_opt = tf.train.AdamOptimizer(self.generator_lr, beta1=0.5,
+            name='g_optimizer')
+        g_grad = g_opt.compute_gradients(generator_loss, var_list=g_vars)
         # tf.clip_by_value(t, clip_value_min, clip_value_max, name=None)
         self.generator_trainer = g_opt.apply_gradients(g_grad)
 
-        d_opt = tf.train.AdamOptimizer(self.discriminator_lr,
-                                                   beta1=0.5)
-        d_grad = d_opt.compute_gradients(generator_loss)
+        d_opt = tf.train.AdamOptimizer(self.discriminator_lr, beta1=0.5,
+            name='d_optimizer')
+        d_grad = d_opt.compute_gradients(discriminator_loss, var_list=d_vars)
         # tf.clip_by_value(t, clip_value_min, clip_value_max, name=None)
-        self.discriminator_trainer= d_opt.apply_gradients(g_grad)
+        self.discriminator_trainer= d_opt.apply_gradients(d_grad)
 
         self.log_vars.append(("g_learning_rate", self.generator_lr))
         self.log_vars.append(("d_learning_rate", self.discriminator_lr))
@@ -144,34 +147,27 @@ class CondGANTrainer(object):
                 all_sum['d'].append(tf.summary.scalar(k, v))
             elif k.startswith('hist'):
                 all_sum['hist'].append(tf.summary.histogram(k, v))
+        self.g_sum = tf.summary.merge(all_sum['g'])
+        self.d_sum = tf.summary.merge(all_sum['d'])
+        self.hist_sum = tf.summary.merge(all_sum['hist'])
 
-    def init_opt(self):
+    def initialize(self):
         self.define_placeholder()
-
-        with tf.variable_scope("g_net"):
-            # ####get output from G network################################
-            c, kl_loss = self.sample_encoded_context(self.embeddings)
-            z = tf.random_normal([self.batch_size, cfg.Z_DIM])
-            self.log_vars.append(("hist_c", c))
-            self.log_vars.append(("hist_z", z))
-            self.model.is_training = cfg.TRAIN.FLAG
-            generator = self.model.get_generator()
-            fake_images = generator(tf.concat([c, z], 1))
-
-        # ####get discriminator_loss and generator_loss ###################
-        with tf.variable_scope("d_net"):
-            discriminator_loss, generator_loss =\
-                self.define_losses(self.images,
-                                    self.wrong_images,
-                                    fake_images,
-                                    self.embeddings)
-        generator_loss += kl_loss
+        mean, logsigma = self.model.generate_condition(self.embeddings)
+        kl_loss = self.get_kl_loss(mean, logsigma)
+        self.model.is_training = cfg.TRAIN.FLAG
+        generator = self.model.get_generator()
+        fake_images = generator(self.sample_encoded_context(mean, logsigma))
+        discriminator = self.model.get_discriminator()
+        real_logit = discriminator(self.images, self.embeddings)
+        wrong_logit = discriminator(self.wrong_images, self.embeddings)
+        fake_logit = discriminator(fake_images, self.embeddings)
+        discriminator_loss, generator_loss =\
+            self.define_losses(real_logit, wrong_logit, fake_logit, kl_loss)
         self.log_vars.append(("g_loss_kl_loss", kl_loss))
         self.log_vars.append(("g_loss", generator_loss))
         self.log_vars.append(("d_loss", discriminator_loss))
-
         self.define_train_op(generator_loss, discriminator_loss)
-
         self.define_summaries()
 
     def sampler(self):
@@ -252,13 +248,10 @@ class CondGANTrainer(object):
         # pfi_train.close()
         pfi_test.close()
 
-    def build_model(self, sess):
-        self.init_opt()
-        sess.run(tf.global_variables_initializer())
-
+    def load_model(self, sess):
         if len(self.model_path) > 0:
             print("Reading model parameters from %s" % self.model_path)
-            restore_vars = tf.all_variables()
+            restore_vars = tf.global_variables()
             saver = tf.train.Saver(restore_vars)
             saver.restore(sess, self.model_path)
 
@@ -268,30 +261,60 @@ class CondGANTrainer(object):
             counter = int(counter)
         else:
             print("Created model with fresh parameters.")
+            sess.run(tf.global_variables_initializer())
             counter = 0
         return counter
+
+    def display_progressbar(self, epoch, updates_per_epoch):
+        widgets = ["epoch #%d|" % epoch,
+                   Percentage(), Bar(), ETA()]
+        progressbar = ProgressBar(maxval=updates_per_epoch,
+                           widgets=widgets)
+        progressbar.start()
+        return progressbar
+
+    def display_loss(self, epoch, log_keys, all_log_vals):
+        avg_log_vals = np.mean(np.array(all_log_vals), axis=0)
+        dic_logs = {}
+        for k, v in zip(log_keys, avg_log_vals):
+            dic_logs[k] = v
+        log_line = "; ".join("%s: %s" %
+                             (str(k), str(dic_logs[k]))
+                             for k in dic_logs)
+        print("Epoch %d | " % (epoch) + log_line)
+        sys.stdout.flush()
+        if np.any(np.isnan(avg_log_vals)):
+            raise ValueError("NaN detected!")
+
+    def save_model(self, sess, counter):
+        if counter % self.snapshot_interval == 0:
+            snapshot_path = "%s/%s_%s.ckpt" %\
+                             (self.checkpoint_dir,
+                              self.exp_name,
+                              str(counter))
+            fn = saver.save(sess, snapshot_path)
+            print("Model saved in file: %s" % fn)
+
+    def get_log_vars(self, keys):
+        log_vars = []
+        log_keys = []
+        for k, v in self.log_vars:
+            if k in keys:
+                log_vars.append(v)
+                log_keys.append(k)
+        return log_vars, log_keys
 
     def train(self):
         config = tf.ConfigProto(allow_soft_placement=True)
         with tf.Session(config=config) as sess:
             with tf.device("/gpu:%d" % cfg.GPU_ID):
-                counter = self.build_model(sess)
-                saver = tf.train.Saver(tf.all_variables(),
+                self.initialize()
+                counter = self.load_model(sess)
+                saver = tf.train.Saver(tf.global_variables(),
                     keep_checkpoint_every_n_hours=1)
-
-                merged = tf.summary.merge_all()
                 summary_writer = tf.summary.FileWriter(self.log_dir,
                                                         sess.graph)
-                # summary = sess.run(merged)
-                # summary_writer.add_summary(summary, 1)
-
-                keys = ["d_loss", "g_loss"]
-                log_vars = []
-                log_keys = []
-                for k, v in self.log_vars:
-                    if k in keys:
-                        log_vars.append(v)
-                        log_keys.append(k)
+                log_vars, log_keys = self.get_log_vars(["d_loss", "g_loss"])
 
                 generator_lr = cfg.TRAIN.GENERATOR_LR
                 discriminator_lr = cfg.TRAIN.DISCRIMINATOR_LR
@@ -299,11 +322,8 @@ class CondGANTrainer(object):
                      self.batch_size)
                 epoch_start = int(counter / updates_per_epoch)
                 for epoch in range(epoch_start, self.max_epoch):
-                    widgets = ["epoch #%d|" % epoch,
-                               Percentage(), Bar(), ETA()]
-                    progressbar = ProgressBar(maxval=updates_per_epoch,
-                                       widgets=widgets)
-                    progressbar.start()
+                    progressbar = self.display_progressbar(
+                        epoch, updates_per_epoch)
 
                     if epoch % cfg.TRAIN.LR_DECAY_EPOCH == 0 and epoch != 0:
                         generator_lr *= 0.5
@@ -323,39 +343,23 @@ class CondGANTrainer(object):
                                      self.discriminator_lr: discriminator_lr
                                      }
                         # train d
-                        feed_out = [self.discriminator_trainer,
-                                    log_vars]
-                        _, log_vals = sess.run(feed_out, feed_dict)
+                        _, d_sum, hist_sum, log_vals = sess.run([\
+                            self.discriminator_trainer, self.d_sum,
+                            self.hist_sum, log_vars], feed_dict)
                         all_log_vals.append(log_vals)
                         # train g
-                        feed_out = [self.generator_trainer]
-                        sess.run(feed_out, feed_dict)
+                        _, g_sum = sess.run([\
+                            self.generator_trainer, self.g_sum], feed_dict)
+                        summary_writer.add_summary(d_sum, counter)
+                        summary_writer.add_summary(g_sum, counter)
+                        summary_writer.add_summary(hist_sum, counter)
                         # save checkpoint
                         counter += 1
-                        if counter % self.snapshot_interval == 0:
-                            snapshot_path = "%s/%s_%s.ckpt" %\
-                                             (self.checkpoint_dir,
-                                              self.exp_name,
-                                              str(counter))
-                            fn = saver.save(sess, snapshot_path)
-                            print("Model saved in file: %s" % fn)
+                        self.save_model(sess, counter)
 
                     # img_sum = self.epoch_sum_images(sess, cfg.TRAIN.NUM_COPY)
                     # summary_writer.add_summary(img_sum, counter)
-
-                    avg_log_vals = np.mean(np.array(all_log_vals), axis=0)
-                    dic_logs = {}
-                    for k, v in zip(log_keys, avg_log_vals):
-                        dic_logs[k] = v
-
-                    log_line = "; ".join("%s: %s" %
-                                         (str(k), str(dic_logs[k]))
-                                         for k in dic_logs)
-                    print("Epoch %d | " % (epoch) + log_line)
-                    sys.stdout.flush()
-                    if np.any(np.isnan(avg_log_vals)):
-                        raise ValueError("NaN detected!")
-
+                    self.display_loss(epoch, log_keys, all_log_vals)
 
     def save_super_images(self, images, sample_batchs, filenames,
         sentenceID, save_dir, subset):
@@ -405,7 +409,7 @@ class CondGANTrainer(object):
                 if self.model_path.find('.ckpt') != -1:
                     self.init_opt()
                     print("Reading model parameters from %s" % self.model_path)
-                    saver = tf.train.Saver(tf.all_variables())
+                    saver = tf.train.Saver(tf.global_variables())
                     saver.restore(sess, self.model_path)
                     # self.eval_one_dataset(sess, self.dataset.train,
                     #                       self.log_dir, subset='train')

@@ -7,7 +7,7 @@ import datetime
 import argparse
 import pprint
 
-from misc.datasets import TextDataset
+from misc.datasets import DataLoader
 from stageI.model import CondGAN
 from stageI.trainer import CondGANTrainer
 from misc.utils import mkdir_p
@@ -36,20 +36,18 @@ if __name__ == "__main__":
     timestamp = now.strftime('%Y_%m_%d_%H_%M_%S')
 
     datadir = 'Data/%s' % cfg.DATASET_NAME
-    dataset = TextDataset(datadir, cfg.EMBEDDING_TYPE, 1)
+    dataset = DataLoader(datadir, cfg.EMBEDDING_TYPE, 1)
     filename_test = '%s/test' % (datadir)
     dataset.test = dataset.get_data(filename_test)
     if cfg.TRAIN.FLAG:
         filename_train = '%s/train' % (datadir)
         dataset.train = dataset.get_data(filename_train)
-
         ckt_logs_dir = "ckt_logs/%s/%s_%s" % \
-            (cfg.DATASET_NAME, cfg.CONFIG_NAME, timestamp)
+            (cfg.DATASET_NAME, cfg.CONFIG_NAME, "testing")
         mkdir_p(ckt_logs_dir)
     else:
         s_tmp = cfg.TRAIN.PRETRAINED_MODEL
         ckt_logs_dir = s_tmp[:s_tmp.find('.ckpt')]
-    #%%
 
     model = CondGAN(
         image_shape=dataset.image_shape
@@ -60,6 +58,7 @@ if __name__ == "__main__":
         dataset=dataset,
         ckt_logs_dir=ckt_logs_dir
     )
+
     if cfg.TRAIN.FLAG:
         algo.train()
     else:

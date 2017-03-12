@@ -198,7 +198,7 @@ class Dataset(object):
                 self._saveIDs[start:end], sampled_captions]
 
 
-class TextDataset(object):
+class DataLoader(object):
     def __init__(self, workdir, embedding_type, hr_lr_ratio):
         lr_imsize = 64
         self.hr_lr_ratio = hr_lr_ratio
@@ -213,18 +213,29 @@ class TextDataset(object):
         self.embedding_shape = None
         self.train = None
         self.test = None
+        self.train_pickle_path = None
+        self.test_pickle_path = None
         self.workdir = workdir
         if embedding_type == 'cnn-rnn':
             self.embedding_filename = '/char-CNN-RNN-embeddings.pickle'
         elif embedding_type == 'skip-thought':
             self.embedding_filename = '/skip-thought-embeddings.pickle'
 
+    def set_train_test_path(self, train_pickle_path, test_pickle_path):
+        self.train_pickle_path = train_pickle_path
+        self.test_pickle_path = test_pickle_path
+
+    def load_data_train_test(self, train_aug_flag=True, test_aug_flag=True):
+        if self.train_pickle_path is not None:
+            self.train = self.get_data(self.train_pickle_path, train_aug_flag)
+        if self.test_pickle_path is not None:
+            self.test = self.get_data(self.test_pickle_path, test_aug_flag)
+
     def get_data(self, pickle_path, aug_flag=True):
         with open(pickle_path + self.image_filename, 'rb') as f:
             images = pickle.load(f)
             images = np.array(images)
             print('images: ', images.shape)
-
         with open(pickle_path + self.embedding_filename, 'rb') as f:
             embeddings = pickle.load(f)
             embeddings = np.array(embeddings)
