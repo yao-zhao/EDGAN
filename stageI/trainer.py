@@ -202,9 +202,9 @@ class CondGANTrainer(object):
             elif k.startswith('hist'):
                 all_sum['hist'].append(tf.summary.histogram(k, v))
 
-        # self.g_sum = tf.merge_summary(all_sum['g'])
-        # self.d_sum = tf.merge_summary(all_sum['d'])
-        # self.hist_sum = tf.merge_summary(all_sum['hist'])
+        self.g_sum = tf.summary.merge(all_sum['g'])
+        self.d_sum = tf.summary.merge(all_sum['d'])
+        self.hist_sum = tf.summary.merge(all_sum['hist'])
 
     def visualize_one_superimage(self, img_var, images, rows, filename):
         stacked_img = []
@@ -229,7 +229,7 @@ class CondGANTrainer(object):
                                           self.images[n * n:2 * n * n],
                                           n, "test")
         self.superimages = tf.concat([superimage_train, superimage_test], 0)
-        # self.image_summary = tf.merge_summary([fake_sum_train, fake_sum_test])
+        self.image_summary = tf.summary.merge([fake_sum_train, fake_sum_test])
 
     def preprocess(self, x, n):
         # make sure every row with n column have the same embeddings
@@ -264,11 +264,11 @@ class CondGANTrainer(object):
             sess.run([self.superimages, self.image_summary], feed_dict)
 
         # save images generated for train and test captions
-        scipy.misc.imsave('%s/train.jpg' % (self.log_dir), gen_samples[0])
-        scipy.misc.imsave('%s/test.jpg' % (self.log_dir), gen_samples[1])
+        scipy.misc.imsave('%s/train_%d.jpg' % (self.log_dir, epoch), gen_samples[0])
+        scipy.misc.imsave('%s/test_%d.jpg' % (self.log_dir, epoch), gen_samples[1])
 
         # pfi_train = open(self.log_dir + "/train.txt", "w")
-        pfi_test = open(self.log_dir + "/test.txt", "w")
+        pfi_test = open(self.log_dir + "/test_%d.txt" % (epoch), "w")
         for row in range(n):
             # pfi_train.write('\n***row %d***\n' % row)
             # pfi_train.write(captions_train[row * n])
