@@ -51,6 +51,8 @@ __C.TRAIN.COEFF.KL = 2.0
 __C.TRAIN.FINETUNE_LR = False
 __C.TRAIN.FT_LR_RETIO = 0.1
 
+__C.TRAIN.WGAN = False
+
 # Modal options
 __C.GAN = edict()
 __C.GAN.EMBEDDING_DIM = 128

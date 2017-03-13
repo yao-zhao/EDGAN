@@ -12,7 +12,7 @@ from misc.config import cfg
 class common_ops(object):
     def __init__(self):
         self.is_training = True
-
+        self.momentum = 0.90
     def leaky_relu(self, x, leakiness=0.01):
         assert leakiness <= 1
         return tf.maximum(x, leakiness * x)
@@ -21,7 +21,8 @@ class common_ops(object):
         return tf.layers.dense(inputs, numoutput,
             activation=None,
             use_bias=True,
-            kernel_initializer=tf.truncated_normal_initializer(stddev=stddev),
+            # kernel_initializer=tf.truncated_normal_initializer(stddev=stddev),
+            kernel_initializer=tf.random_normal_initializer(stddev=stddev),
             bias_initializer=tf.zeros_initializer(),
             kernel_regularizer=None,
             bias_regularizer=None,
@@ -41,7 +42,7 @@ class common_ops(object):
 
     def batch_norm(self, inputs):
         return tf.layers.batch_normalization(inputs, axis=-1,
-            momentum=0.99, epsilon=0.001,
+            momentum=self.momentum, epsilon=0.001,
             center=True, scale=True,
             beta_initializer=tf.zeros_initializer(),
             gamma_initializer=tf.ones_initializer(),

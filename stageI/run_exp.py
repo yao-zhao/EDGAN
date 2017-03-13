@@ -43,7 +43,7 @@ if __name__ == "__main__":
         filename_train = '%s/train' % (datadir)
         dataset.train = dataset.get_data(filename_train)
         ckt_logs_dir = "ckt_logs/%s/%s_%s" % \
-            (cfg.DATASET_NAME, cfg.CONFIG_NAME, "testing")
+            (cfg.DATASET_NAME, cfg.CONFIG_NAME, timestamp)
         mkdir_p(ckt_logs_dir)
     else:
         s_tmp = cfg.TRAIN.PRETRAINED_MODEL

@@ -14,9 +14,6 @@ from misc.utils import mkdir_p
 
 TINY = 1e-8
 
-
-
-
 class CondGANTrainer(object):
     def __init__(self, model, dataset=None, exp_name="model",
         ckt_logs_dir="ckt_logs",):
@@ -172,27 +169,28 @@ class CondGANTrainer(object):
 
     def initialize(self):
         self.define_placeholder()
-        mean, logsigma = self.model.generate_condition(self.embeddings)
-        c = self.sample_encoded_context(mean, logsigma)
-        kl_loss = self.get_kl_loss(mean, logsigma)
-        # fake images for train
-        with tf.variable_scope('g_sample_bg_train'):
-            c_z_concat_train = self.sample_background(c)
+        self.model.momentum = 0.9
         with tf.variable_scope('g_net'):
             self.model.is_training = True
+            mean, logsigma = self.model.generate_condition(self.embeddings)
+            c = self.sample_encoded_context(mean, logsigma)
+            kl_loss = self.get_kl_loss(mean, logsigma)
+            with tf.variable_scope('g_sample_bg_train'):
+                c_z_concat_train = self.sample_background(c)
             fake_images = self.model.g_generator(c_z_concat_train)
-        # fake images for show
-        with tf.variable_scope('g_sample_bg_test'):
-            c_z_concat_test = self.sample_background(c, not cfg.TRAIN.FLAG)
         with tf.variable_scope('g_net', reuse=True):
-            self.model.is_training = False # change to false, testing true now
+            self.model.is_training = False
+            mean, logsigma = self.model.generate_condition(self.embeddings)
+            c = self.sample_encoded_context(mean, logsigma)
+            with tf.variable_scope('g_sample_bg_test'):
+                c_z_concat_test = self.sample_background(c, not cfg.TRAIN.FLAG)
             self.fake_images = self.model.g_generator(c_z_concat_test)
 
         self.model.is_training = True
         discriminator = self.model.get_discriminator()
+        fake_output = discriminator(fake_images, self.embeddings)
         real_output = discriminator(self.images, self.embeddings)
         wrong_output = discriminator(self.wrong_images, self.embeddings)
-        fake_output = discriminator(fake_images, self.embeddings)
         discriminator_loss, generator_loss =\
             self.define_losses(real_output, wrong_output, fake_output, kl_loss)
         self.log_vars.append(("g_loss_kl_loss", kl_loss))
@@ -395,7 +393,7 @@ class CondGANTrainer(object):
 
                     img_sum = self.epoch_sum_images(\
                         sess, cfg.TRAIN.NUM_COPY, epoch)
-                    summary_writer.add_summary(img_sum, counter)
+                    summary_writer.add_summary(img_sum, epoch)
                     self.display_loss(epoch, log_keys, all_log_vals)
 
     def save_super_images(self, images, sample_batchs, filenames,
