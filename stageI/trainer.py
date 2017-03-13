@@ -84,26 +84,34 @@ class CondGANTrainer(object):
                 loss = 0
             return loss
 
-    def define_losses(self, real_logit, wrong_logit, fake_logit, kl_loss):
+    def define_losses(self, real_output, wrong_output, fake_output, kl_loss):
         with tf.variable_scope('d_loss'):
-            with tf.variable_scope('real_d_loss'):
-                real_d_loss =\
-                    tf.nn.sigmoid_cross_entropy_with_logits(
-                        labels = tf.ones_like(real_logit),
-                        logits = real_logit,)
-                real_d_loss = tf.reduce_mean(real_d_loss)
-            with tf.variable_scope('wrong_d_loss'):
-                wrong_d_loss =\
-                    tf.nn.sigmoid_cross_entropy_with_logits(
-                        labels = tf.zeros_like(wrong_logit),
-                        logits = wrong_logit)
-                wrong_d_loss = tf.reduce_mean(wrong_d_loss)
-            with tf.variable_scope('fake_d_loss'):
-                fake_d_loss =\
-                    tf.nn.sigmoid_cross_entropy_with_logits(
-                        labels = tf.zeros_like(fake_logit),
-                        logits = fake_logit)
-                fake_d_loss = tf.reduce_mean(fake_d_loss)
+            if cfg.TRAIN.WGAN:
+                with tf.variable_scope('real_d_loss'):
+                    real_d_loss = tf.reduce_mean(real_output)
+                with tf.variable_scope('wrong_d_loss'):
+                    wrong_d_loss = -tf.reduce_mean(wrong_output)
+                with tf.variable_scope('fake_d_loss'):
+                    fake_d_loss = -tf.reduce_mean(fake_output)
+            else:
+                with tf.variable_scope('real_d_loss'):
+                    real_d_loss =\
+                        tf.nn.sigmoid_cross_entropy_with_logits(
+                            labels = tf.ones_like(real_output),
+                            logits = real_output,)
+                    real_d_loss = tf.reduce_mean(real_d_loss)
+                with tf.variable_scope('wrong_d_loss'):
+                    wrong_d_loss =\
+                        tf.nn.sigmoid_cross_entropy_with_logits(
+                            labels = tf.zeros_like(wrong_output),
+                            logits = wrong_output)
+                    wrong_d_loss = tf.reduce_mean(wrong_d_loss)
+                with tf.variable_scope('fake_d_loss'):
+                    fake_d_loss =\
+                        tf.nn.sigmoid_cross_entropy_with_logits(
+                            labels = tf.zeros_like(fake_output),
+                            logits = fake_output)
+                    fake_d_loss = tf.reduce_mean(fake_d_loss)
             if cfg.TRAIN.B_WRONG:
                 discriminator_loss =\
                     real_d_loss + (wrong_d_loss + fake_d_loss) / 2.
@@ -113,11 +121,14 @@ class CondGANTrainer(object):
             self.log_vars.append(("d_loss_real", real_d_loss))
             self.log_vars.append(("d_loss_fake", fake_d_loss))
         with tf.variable_scope('g_loss'):
-            generator_loss = \
-                tf.nn.sigmoid_cross_entropy_with_logits(
-                    labels = tf.ones_like(fake_logit),
-                    logits = fake_logit)
-            generator_loss = tf.reduce_mean(generator_loss)
+            if cfg.TRAIN.WGAN:
+                generator_loss = tf.reduce_mean(fake_output)
+            else:
+                generator_loss = \
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels = tf.ones_like(fake_output),
+                        logits = fake_output)
+                generator_loss = tf.reduce_mean(generator_loss)
             generator_loss += kl_loss
         return discriminator_loss, generator_loss
 
@@ -172,17 +183,18 @@ class CondGANTrainer(object):
             fake_images = self.model.g_generator(c_z_concat_train)
         # fake images for show
         with tf.variable_scope('g_sample_bg_test'):
-            c_z_concat_test = self.sample_background(c, cfg.TRAIN.FLAG)
+            c_z_concat_test = self.sample_background(c, not cfg.TRAIN.FLAG)
         with tf.variable_scope('g_net', reuse=True):
-            self.model.is_training = False
+            self.model.is_training = False # change to false, testing true now
             self.fake_images = self.model.g_generator(c_z_concat_test)
 
+        self.model.is_training = True
         discriminator = self.model.get_discriminator()
-        real_logit = discriminator(self.images, self.embeddings)
-        wrong_logit = discriminator(self.wrong_images, self.embeddings)
-        fake_logit = discriminator(fake_images, self.embeddings)
+        real_output = discriminator(self.images, self.embeddings)
+        wrong_output = discriminator(self.wrong_images, self.embeddings)
+        fake_output = discriminator(fake_images, self.embeddings)
         discriminator_loss, generator_loss =\
-            self.define_losses(real_logit, wrong_logit, fake_logit, kl_loss)
+            self.define_losses(real_output, wrong_output, fake_output, kl_loss)
         self.log_vars.append(("g_loss_kl_loss", kl_loss))
         self.log_vars.append(("g_loss", generator_loss))
         self.log_vars.append(("d_loss", discriminator_loss))
