@@ -377,33 +377,31 @@ class CondGANTrainer(object):
                     all_log_vals = []
                     for i in range(updates_per_epoch):
                         pbar.update(i)
-                        # training d
-                        images, wrong_images, embeddings, _, _ =\
-                            self.dataset.train.next_batch(self.batch_size,
-                                                          num_embedding)
-                        feed_dict = {self.images: images,
-                                     self.wrong_images: wrong_images,
-                                     self.embeddings: embeddings,
-                                     self.generator_lr: generator_lr,
-                                     self.discriminator_lr: discriminator_lr
-                                     }
-                        # train d
                         feed_out = [self.discriminator_trainer,
                                     self.d_sum,
                                     self.hist_sum,
                                     log_vars]
                         if cfg.TRAIN.WGAN:
-                            for _ in range(cfg.TRAIN.CRITIC_PER_GENERATION):
-                                _,d_sum, hist_sum, log_vals = \
-                                sess.run(feed_out, feed_dict)
+                            critc_per_gen = cfg.TRAIN.CRITIC_PER_GENERATION
                         else:
+                            critc_per_gen = 1
+                        for _ in range(critc_per_gen):
+                            images, wrong_images, embeddings, _, _ =\
+                            self.dataset.train.next_batch(self.batch_size,
+                                                          num_embedding)
+                            feed_dict = {self.images: images,
+                                         self.wrong_images: wrong_images,
+                                         self.embeddings: embeddings,
+                                         self.generator_lr: generator_lr,
+                                         self.discriminator_lr: discriminator_lr
+                                         }
+                            # training d
                             _,d_sum, hist_sum, log_vals = \
                                 sess.run(feed_out, feed_dict)
+                            sess.run(self.weight_clip_op)
                         summary_writer.add_summary(d_sum, counter)
                         summary_writer.add_summary(hist_sum, counter)
                         all_log_vals.append(log_vals)
-                        # clip weight
-                        sess.run(self.weight_clip_op)
                         # train g
                         feed_out = [self.generator_trainer,
                                     self.g_sum,
