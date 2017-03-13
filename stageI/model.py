@@ -34,17 +34,18 @@ class CondGAN(common_ops):
         with tf.variable_scope('node0'):
             node0 = self.dense(z_var, self.s16 * self.s16 * self.gf_dim * 8)
             node0 = self.batch_norm(node0)
-        with tf.variable_scope('node1'):
             node0 = tf.reshape(node0, [-1, self.s16, self.s16, self.gf_dim * 8])
+        with tf.variable_scope('node1'):
             node1_1 = self.bottleneck_stack(node0, self.gf_dim * 8)
             node1 = tf.nn.relu(tf.add(node0, node1_1))
             node1 = tf.image.resize_nearest_neighbor(node1, [self.s8, self.s8])
         with tf.variable_scope('node2'):
-            # here is different from original stackgan
-            with tf.variable_scope('branch1'):
-                node2_0 = self.conv(node1, self.gf_dim * 4)
-                node2_0 = self.batch_norm(node2_0)
-            node2_1 = self.bottleneck_stack(node1, self.gf_dim * 4)
+            # here is different from original stackgan, bug not here
+            # with tf.variable_scope('branch1'):
+            node2_0 = self.conv(node1, self.gf_dim * 4)
+            node2_0 = self.batch_norm(node2_0)
+            # node2_1 = self.bottleneck_stack(node1, self.gf_dim * 4)
+            node2_1 = self.bottleneck_stack(node2_0, self.gf_dim * 4)
             node2 = tf.nn.relu(tf.add(node2_0, node2_1))
         with tf.variable_scope('node3'):
             node3 = tf.image.resize_nearest_neighbor(node2, [self.s4, self.s4])
@@ -57,7 +58,7 @@ class CondGAN(common_ops):
         with tf.variable_scope('node5'):
             node5 = tf.image.resize_nearest_neighbor(node4, [self.s, self.s])
             node5 = self.conv(node5, 3)
-            node5 = tf.nn.relu(self.batch_norm(node5))
+            # node5 = tf.nn.relu(self.batch_norm(node5)) remove this important
         return tf.nn.tanh(node5)
 
     # def get_generator(self):
@@ -78,11 +79,17 @@ class CondGAN(common_ops):
                 node2 = self.conv_leaky(node1, self.df_dim * 2,
                     kernel_size=(4, 4), strides=(2, 2))
             with tf.variable_scope('node3'):
-                node3 = self.conv_leaky(node2, self.df_dim * 4,
+                # node3 = self.conv_leaky(node2, self.df_dim * 4,
+                #     kernel_size=(4, 4), strides=(2, 2))
+                node3 = self.conv(node2, self.df_dim * 4,
                     kernel_size=(4, 4), strides=(2, 2))
+                node3 = self.batch_norm(node3)
             with tf.variable_scope('node4'):
-                node4 = self.conv_leaky(node3, self.df_dim * 8,
+                # node4 = self.conv_leaky(node3, self.df_dim * 8,
+                    # kernel_size=(4, 4), strides=(2, 2))
+                node4 = self.conv(node3, self.df_dim * 8,
                     kernel_size=(4, 4), strides=(2, 2))
+                node4 = self.batch_norm(node4)
             with tf.variable_scope('node5'):
                 node5_1 = self.bottleneck_stack(node4, self.df_dim * 8)
                 node5 = self.leaky_relu(tf.add(node4, node5_1))
