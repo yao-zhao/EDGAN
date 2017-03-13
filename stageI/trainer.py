@@ -238,7 +238,7 @@ class CondGANTrainer(object):
                 x[i * n + j] = x[i * n]
         return x
 
-    def epoch_sum_images(self, sess, n):
+    def epoch_sum_images(self, sess, n, epoch):
         images_train, _, embeddings_train, captions_train, _ =\
             self.dataset.train.next_batch(n * n, cfg.TRAIN.NUM_EMBEDDING)
         images_train = self.preprocess(images_train, n)
@@ -384,7 +384,7 @@ class CondGANTrainer(object):
                             fn = saver.save(sess, snapshot_path)
                             print("Model saved in file: %s" % fn)
 
-                    img_sum = self.epoch_sum_images(sess, cfg.TRAIN.NUM_COPY)
+                    img_sum = self.epoch_sum_images(sess, cfg.TRAIN.NUM_COPY, epoch)
                     # summary_writer.add_summary(img_sum, counter)
 
                     avg_log_vals = np.mean(np.array(all_log_vals), axis=0)
