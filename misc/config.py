@@ -30,6 +30,8 @@ __C.TEST.CAPTION_PATH = ''
 # Training options
 __C.TRAIN = edict()
 __C.TRAIN.FLAG = True
+__C.TRAIN.WGAN = True
+__C.TRAIN.WEIGHT_CLIP = 0.02
 __C.TRAIN.BATCH_SIZE = 64
 __C.TRAIN.NUM_COPY = 4
 __C.TRAIN.MAX_EPOCH = 600

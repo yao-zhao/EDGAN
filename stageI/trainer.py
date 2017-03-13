@@ -135,21 +135,33 @@ class CondGANTrainer(object):
         wrong_logit = self.model.get_discriminator(wrong_images, embeddings)
         fake_logit = self.model.get_discriminator(fake_images, embeddings)
 
-        real_d_loss =\
-            tf.nn.sigmoid_cross_entropy_with_logits(
-                                                    labels = tf.ones_like(real_logit),
-                                                    logits = real_logit,)
-        real_d_loss = tf.reduce_mean(real_d_loss)
-        wrong_d_loss =\
-            tf.nn.sigmoid_cross_entropy_with_logits(
-                                                    labels = tf.zeros_like(wrong_logit),
-                                                    logits = wrong_logit)
-        wrong_d_loss = tf.reduce_mean(wrong_d_loss)
-        fake_d_loss =\
-            tf.nn.sigmoid_cross_entropy_with_logits(
-                                                    labels = tf.zeros_like(fake_logit),
-                                                    logits = fake_logit)
-        fake_d_loss = tf.reduce_mean(fake_d_loss)
+        if cfg.TRAIN.WGAN:
+            real_d_loss = tf.reduce_mean(real_logit)
+            wrong_d_loss = -tf.reduce_mean(wrong_logit)
+            fake_d_loss = -tf.reduce_mean(fake_logit)
+            generator_loss = tf.reduce_mean(fake_logit)
+        else:
+            real_d_loss =\
+                tf.nn.sigmoid_cross_entropy_with_logits(
+                                                        labels = tf.ones_like(real_logit),
+                                                        logits = real_logit,)
+            real_d_loss = tf.reduce_mean(real_d_loss)
+            wrong_d_loss =\
+                tf.nn.sigmoid_cross_entropy_with_logits(
+                                                        labels = tf.zeros_like(wrong_logit),
+                                                        logits = wrong_logit)
+            wrong_d_loss = tf.reduce_mean(wrong_d_loss)
+            fake_d_loss =\
+                tf.nn.sigmoid_cross_entropy_with_logits(
+                                                        labels = tf.zeros_like(fake_logit),
+                                                        logits = fake_logit)
+            fake_d_loss = tf.reduce_mean(fake_d_loss)
+            generator_loss = \
+                tf.nn.sigmoid_cross_entropy_with_logits(
+                                                        labels = tf.ones_like(fake_logit),
+                                                        logits = fake_logit)
+            generator_loss = tf.reduce_mean(generator_loss)
+
         if cfg.TRAIN.B_WRONG:
             discriminator_loss =\
                 real_d_loss + (wrong_d_loss + fake_d_loss) / 2.
@@ -158,12 +170,6 @@ class CondGANTrainer(object):
             discriminator_loss = real_d_loss + fake_d_loss
         self.log_vars.append(("d_loss_real", real_d_loss))
         self.log_vars.append(("d_loss_fake", fake_d_loss))
-
-        generator_loss = \
-            tf.nn.sigmoid_cross_entropy_with_logits(
-                                                    labels = tf.ones_like(fake_logit),
-                                                    logits = fake_logit)
-        generator_loss = tf.reduce_mean(generator_loss)
 
         return discriminator_loss, generator_loss
 
@@ -176,18 +182,29 @@ class CondGANTrainer(object):
         d_vars = [var for var in all_vars if
                   var.name.startswith('d_')]
 
-        generator_opt = tf.train.AdamOptimizer(self.generator_lr,
-                                               beta1=0.5)
+        if cfg.TRAIN.WGAN:
+            generator_opt = tf.train.RMSPropOptimizer(self.generator_lr)
+            discriminator_opt = tf.train.RMSPropOptimizer(self.discriminator_lr)
+            self.weight_clip_op = []
+            for d_var in d_vars:
+                self.weight_clip_op.append(tf.clip_by_value(d_var,
+                    -cfg.TRAIN.WEIGHT_CLIP, cfg.TRAIN.WEIGHT_CLIP))
+
+        else:
+            generator_opt = tf.train.AdamOptimizer(self.generator_lr,
+                                                   beta1=0.5)
+            discriminator_opt = tf.train.AdamOptimizer(self.discriminator_lr,
+                                                       beta1=0.5)
+
         self.generator_trainer =\
             pt.apply_optimizer(generator_opt,
                                losses=[generator_loss],
                                var_list=g_vars)
-        discriminator_opt = tf.train.AdamOptimizer(self.discriminator_lr,
-                                                   beta1=0.5)
         self.discriminator_trainer =\
             pt.apply_optimizer(discriminator_opt,
                                losses=[discriminator_loss],
                                var_list=d_vars)
+
         self.log_vars.append(("g_learning_rate", self.generator_lr))
         self.log_vars.append(("d_learning_rate", self.discriminator_lr))
 
@@ -366,6 +383,8 @@ class CondGANTrainer(object):
                         # summary_writer.add_summary(d_sum, counter)
                         # summary_writer.add_summary(hist_sum, counter)
                         all_log_vals.append(log_vals)
+                        # clip weight
+                        _, sess.run(self.weight_clip_op)
                         # train g
                         feed_out = [self.generator_trainer,
                                     # self.g_sum,
