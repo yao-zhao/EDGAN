@@ -42,7 +42,7 @@ class common_ops(object):
 
     def batch_norm(self, inputs):
         return tf.layers.batch_normalization(inputs, axis=-1,
-            momentum=self.momentum, epsilon=0.001,
+            momentum=self.momentum, epsilon=1e-5,
             center=True, scale=True,
             beta_initializer=tf.zeros_initializer(),
             gamma_initializer=tf.ones_initializer(),

@@ -74,26 +74,17 @@ class CondGAN(common_ops):
     def d_encode_image(self, inputs):
         with tf.variable_scope('d_encode'):
             with tf.variable_scope('node1'):
-                # node1 = self.conv_leaky(inputs, self.df_dim,
-                    # kernel_size=(4, 4), strides=(2, 2))
-                node1 = self.conv(inputs, self.df_dim,
+                node1 = self.conv_leaky(inputs, self.df_dim,
                     kernel_size=(4, 4), strides=(2, 2))
-                node1 = self.batch_norm(node1)
             with tf.variable_scope('node2'):
                 node2 = self.conv_leaky(node1, self.df_dim * 2,
                     kernel_size=(4, 4), strides=(2, 2))
             with tf.variable_scope('node3'):
-                # node3 = self.conv_leaky(node2, self.df_dim * 4,
-                #     kernel_size=(4, 4), strides=(2, 2))
-                node3 = self.conv(node2, self.df_dim * 4,
+                node3 = self.conv_leaky(node2, self.df_dim * 4,
                     kernel_size=(4, 4), strides=(2, 2))
-                node3 = self.batch_norm(node3)
             with tf.variable_scope('node4'):
-                # node4 = self.conv_leaky(node3, self.df_dim * 8,
-                    # kernel_size=(4, 4), strides=(2, 2))
-                node4 = self.conv(node3, self.df_dim * 8,
+                node4 = self.conv_leaky(node3, self.df_dim * 8,
                     kernel_size=(4, 4), strides=(2, 2))
-                node4 = self.batch_norm(node4)
             with tf.variable_scope('node5'):
                 node5_1 = self.bottleneck_stack(node4, self.df_dim * 8)
                 node5 = self.leaky_relu(tf.add(node4, node5_1))

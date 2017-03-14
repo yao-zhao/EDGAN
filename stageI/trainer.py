@@ -140,14 +140,12 @@ class CondGANTrainer(object):
         g_opt = tf.train.AdamOptimizer(self.generator_lr, beta1=0.5,
             name='g_optimizer')
         g_grad = g_opt.compute_gradients(generator_loss, var_list=g_vars)
-        # tf.clip_by_value(t, clip_value_min, clip_value_max, name=None)
         self.generator_trainer = g_opt.apply_gradients(g_grad,
             name='g_grad_apply')
 
         d_opt = tf.train.AdamOptimizer(self.discriminator_lr, beta1=0.5,
             name='d_optimizer')
         d_grad = d_opt.compute_gradients(discriminator_loss, var_list=d_vars)
-        # tf.clip_by_value(t, clip_value_min, clip_value_max, name=None)
         self.discriminator_trainer= d_opt.apply_gradients(d_grad,
             name='d_grad_apply')
 
@@ -174,12 +172,12 @@ class CondGANTrainer(object):
             self.model.is_training = True
             mean, logsigma = self.model.generate_condition(self.embeddings)
             c = self.sample_encoded_context(mean, logsigma)
-            kl_loss = self.get_kl_loss(mean, logsigma)
             with tf.variable_scope('g_sample_bg_train'):
                 c_z_concat_train = self.sample_background(c)
             fake_images = self.model.g_generator(c_z_concat_train)
+        kl_loss = self.get_kl_loss(mean, logsigma)
         with tf.variable_scope('g_net', reuse=True):
-            self.model.is_training = False
+            self.model.is_training = True
             mean, logsigma = self.model.generate_condition(self.embeddings)
             c = self.sample_encoded_context(mean, logsigma)
             with tf.variable_scope('g_sample_bg_test'):
@@ -221,14 +219,16 @@ class CondGANTrainer(object):
         return tf.summary.image(filename, imgs), imgs
 
     def visualization(self, n):
-        fake_sum_train, superimage_train = \
-            self.visualize_one_superimage(self.fake_images[:n * n],
-                                          self.images[:n * n],
-                                          n, "train")
-        fake_sum_test, superimage_test = \
-            self.visualize_one_superimage(self.fake_images[n * n:2 * n * n],
-                                          self.images[n * n:2 * n * n],
-                                          n, "test")
+        with tf.variable_scope('visualization_train'):
+            fake_sum_train, superimage_train = \
+                self.visualize_one_superimage(self.fake_images[:n * n],
+                                              self.images[:n * n],
+                                              n, "train")
+        with tf.variable_scope('visualization_test'):
+            fake_sum_test, superimage_test = \
+                self.visualize_one_superimage(self.fake_images[n * n:2 * n * n],
+                                              self.images[n * n:2 * n * n],
+                                              n, "test")
         self.superimages = tf.concat([superimage_train, superimage_test], 0)
         self.image_summary = tf.summary.merge([fake_sum_train, fake_sum_test])
 
