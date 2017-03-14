@@ -143,7 +143,7 @@ class CondGANTrainer(object):
                 real_d_loss = tf.reduce_mean(tf.square(real_logit - 1))
                 wrong_d_loss = tf.reduce_mean(tf.square(wrong_logit))
                 fake_d_loss = tf.reduce_mean(tf.square(fake_logit))
-                generator_loss = tf.reduce_mean(tf.square(fake_logit - 1))
+                generator_loss = 2*tf.reduce_mean(tf.square(fake_logit - 1))
             elif cfg.TRAIN.WGAN:
                 real_d_loss = tf.reduce_mean(real_logit)
                 wrong_d_loss = -tf.reduce_mean(wrong_logit)
