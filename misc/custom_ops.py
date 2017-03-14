@@ -93,7 +93,7 @@ class custom_deconv2d(pt.VarStoreMethod):
                  k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
                  name="deconv2d"):
         output_shape[0] = input_layer.shape[0]
-        ts_output_shape = tf.pack(output_shape)
+        ts_output_shape = tf.stack(output_shape)
         with tf.variable_scope(name):
             # filter : [height, width, output_channels, in_channels]
             w = self.variable('w', [k_h, k_w, output_shape[-1], input_layer.shape[-1]],

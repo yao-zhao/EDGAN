@@ -16,6 +16,7 @@ This repository modifies the original StackGAN code
 # Test results
 - WGAN, takes longer to train, unclear about improvements
 - LSGAN, wrose result, shorter to train
+- LSGAN, later gennet.
 
 <!-- 
 # questions:

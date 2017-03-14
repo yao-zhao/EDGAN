@@ -60,7 +60,7 @@ __C.GAN = edict()
 __C.GAN.EMBEDDING_DIM = 128
 __C.GAN.DF_DIM = 64
 __C.GAN.GF_DIM = 128
-__C.GAN.NETWORK_TYPE = 'default'
+__C.GAN.NETWORK_TYPE = 'large'
 
 
 def _merge_a_into_b(a, b):
