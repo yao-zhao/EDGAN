@@ -160,12 +160,14 @@ class CondGAN(object):
         node1_0 = \
             (pt.template("input").
              custom_conv2d(self.df_dim, k_h=4, k_w=4).
+             conv_batch_norm().
              apply(leaky_rectify, leakiness=0.2).
              custom_conv2d(self.df_dim * 2, k_h=4, k_w=4).
              conv_batch_norm().
              apply(leaky_rectify, leakiness=0.2).
              custom_conv2d(self.df_dim * 4, k_h=4, k_w=4).
              conv_batch_norm().
+             apply(leaky_rectify, leakiness=0.2).
              custom_conv2d(self.df_dim * 8, k_h=4, k_w=4).
              conv_batch_norm())
         node1_1 = \
