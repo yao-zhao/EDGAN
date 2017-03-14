@@ -41,7 +41,6 @@ class CondGAN(common_ops):
                 node1 = tf.nn.relu(tf.add(node0, node1_1))
                 node1 = tf.image.resize_nearest_neighbor(node1, [self.s8, self.s8])
             with tf.variable_scope('node2'):
-                # here is different from original stackgan, bug not here
                 # with tf.variable_scope('branch1'):
                 node2_0 = self.conv(node1, self.gf_dim * 4)
                 node2_0 = self.batch_norm(node2_0)
@@ -59,7 +58,6 @@ class CondGAN(common_ops):
             with tf.variable_scope('node5'):
                 node5 = tf.image.resize_nearest_neighbor(node4, [self.s, self.s])
                 node5 = self.conv(node5, 3)
-            # node5 = tf.nn.relu(self.batch_norm(node5)) remove this important
         return tf.nn.tanh(node5)
 
     # def get_generator(self):
