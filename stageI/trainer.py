@@ -137,7 +137,14 @@ class CondGANTrainer(object):
         fake_logit = self.model.get_discriminator(fake_images, embeddings)
 
         with tf.variable_scope("losses"):
-            if cfg.TRAIN.WGAN:
+            if cfg.TRAIN.LSGAN and cfg.TRAIN.WGAN:
+                raise ValueError("NaN detected!")
+            if cfg.TRAIN.LSGAN:
+                real_d_loss = tf.reduce_mean(tf.square(real_logit - 1))
+                wrong_d_loss = tf.reduce_mean(tf.square(wrong_logit))
+                fake_d_loss = tf.reduce_mean(tf.square(fake_logit))
+                generator_loss = tf.reduce_mean(tf.square(fake_logit - 1))
+            elif cfg.TRAIN.WGAN:
                 real_d_loss = tf.reduce_mean(real_logit)
                 wrong_d_loss = -tf.reduce_mean(wrong_logit)
                 fake_d_loss = -tf.reduce_mean(fake_logit)
@@ -381,11 +388,7 @@ class CondGANTrainer(object):
                                     self.d_sum,
                                     self.hist_sum,
                                     log_vars]
-                        if cfg.TRAIN.WGAN:
-                            critc_per_gen = cfg.TRAIN.CRITIC_PER_GENERATION
-                        else:
-                            critc_per_gen = 1
-                        for _ in range(critc_per_gen):
+                        for _ in range(cfg.TRAIN.CRITIC_PER_GENERATION):
                             images, wrong_images, embeddings, _, _ =\
                             self.dataset.train.next_batch(self.batch_size,
                                                           num_embedding)
