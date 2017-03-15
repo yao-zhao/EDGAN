@@ -6,17 +6,18 @@ This repository modifies the original StackGAN code
 # New features
 - Option to train with WGAN
 - Option to train with LSGAN
-- Option to train with BGAN
+- * Option to train with BGAN
+- preprocess MSCOCO and char-CNN-RNN embedding to tfrecords
+- dataloader that load tfrecords from mscoco, does augmentation and embedding sampling
+
+
 
 # ToDo List
 ## interface for MSCOCO dataset
-- load trained char-CNN-RNN
-- load MSCOO
-- preprocess
-- batch pipline
-
+- change batch method
+- deal with negative sample problem
 - Multi Stack tests
-- Transfer learning from trained classifcation
+- Transfer learning from trained classifcation to form intermediate map
 
 # Test results
 - WGAN, takes longer to train, unclear about improvements
@@ -24,6 +25,10 @@ This repository modifies the original StackGAN code
 - LSGAN, later gennet.
 
 <!-- 
+# retest things!
+
+lr rate not loaded need to used load
+
 # questions:
 
 - regularization?

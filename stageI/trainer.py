@@ -326,10 +326,6 @@ class CondGANTrainer(object):
         if len(self.model_path) > 0:
             print("Reading model parameters from %s" % self.model_path)
             restore_vars = tf.global_variables()
-            # all_vars = tf.global_variables()
-            # restore_vars = [var for var in all_vars if
-            #                 var.name.startswith('g_') or
-            #                 var.name.startswith('d_')]
             saver = tf.train.Saver(restore_vars)
             saver.restore(sess, self.model_path)
 
