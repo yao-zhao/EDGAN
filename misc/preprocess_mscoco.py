@@ -16,8 +16,10 @@ LR_HR_RETIO = 4
 IMSIZE = 256
 LOAD_SIZE = int(IMSIZE * 76 / 64)
 COCO_DIR = 'Data/mscoco'
-KEEP_RATIO = False
+KEEP_RATIO = True
 ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
+CV_FLAG = cv2.INTER_LINEAR
+DEBUG = False
 
 def save_data_seperate(inpath, outpath):
     filenames = os.listdir(inpath)
@@ -32,54 +34,25 @@ def save_data_seperate(inpath, outpath):
             h = float(img.shape[0])
             w = float(img.shape[1])
             minshape = np.min([h, w])
-            img = cv2.resize(img, (int(IMSIZE*h/minshape), int(IMSIZE*w/minshape)))
+            img = cv2.resize(img,
+                (int(IMSIZE*w/minshape), int(IMSIZE*h/minshape)),
+                interpolation=CV_FLAG)
             cv2.imwrite(os.path.join(hr_path, filename), img)
             print(filename, int(IMSIZE*h/minshape), int(IMSIZE*w/minshape))
-            img = cv2.resize(img, (int(lr_size*h/minshape), int(lr_size*h/minshape)))
+            img = cv2.resize(img,
+                (int(lr_size*w/minshape), int(lr_size*h/minshape)),
+                interpolation=CV_FLAG)
             cv2.imwrite(os.path.join(lr_path, filename), img)
             print(filename, int(lr_size*h/minshape), int(lr_size*w/minshape))
         else:
-            img = cv2.resize(img, (IMSIZE, IMSIZE))
+            img = cv2.resize(img, (IMSIZE, IMSIZE),
+                interpolation=CV_FLAG)
             cv2.imwrite(os.path.join(hr_path, filename), img)
-            img = cv2.resize(img, (lr_size, lr_size))
+            img = cv2.resize(img, (lr_size, lr_size),
+                interpolation=CV_FLAG)
             cv2.imwrite(os.path.join(lr_path, filename), img)
             print(filename)
 
-def save_data_list(inpath, outpath):
-    hr_images = []
-    lr_images = []
-    filenames = os.listdir(inpath)
-    filenames.sort()
-    print('number of training images: '+str(len(filenames)))
-    lr_size = int(LOAD_SIZE / LR_HR_RETIO)
-    numfiles = len(filenames)
-    with open(outfile, 'wb') as f_out:
-        for i, filename in zip(range(numfiles), filenames):
-            img = cv2.imread(os.path.join(inpath, filename))
-            if KEEP_RATIO:
-                h = float(img.shape[0])
-                w = float(img.shape[1])
-                minshape = np.min([h, w])
-                hr_img = cv2.resize(img, (int(IMSIZE*h/minshape), int(IMSIZE*w/minshape)))
-                lr_img = cv2.resize(img, (int(lr_size*h/minshape), int(lr_size*h/minshape)))
-            else:
-                hr_img = cv2.resize(img, (IMSIZE, IMSIZE))
-                lr_img = cv2.resize(img, (lr_size, lr_size))
-            lr_images.append(lr_img)
-            hr_images.append(hr_img)
-            if i % int(numfiles/100) == 0:
-                print('process %.2f'% (i * 1. / numfiles))
-    print('start writing')
-    
-    outfile = outpath + str(LOAD_SIZE) + 'images.pickle'
-    with open(outfile, 'wb') as f_out:
-        pickle.dump(hr_images, f_out)
-        print('save to: ', outfile)
-    #
-    outfile = outpath + str(lr_size) + 'images.pickle'
-    with open(outfile, 'wb') as f_out:
-        pickle.dump(lr_images, f_out)
-        print('save to: ', outfile)
 
 def save_embedding(inpath, outpath):
     filenames = os.listdir(inpath)
@@ -96,27 +69,31 @@ def save_tfrecords(imagepath, embeddingpath, outpath):
 
     filenames = os.listdir(imagepath)
     filenames.sort()
-    # filenames = filenames[:10]
+    if DEBUG: filenames = filenames[:100]
     print('number of training images: '+str(len(filenames)))
     lr_size = int(LOAD_SIZE / LR_HR_RETIO)
     numfiles = len(filenames)
     with tf.python_io.TFRecordWriter(
         os.path.join(outpath, str(lr_size)+'.tfrecords')) as lr_writer, \
         tf.python_io.TFRecordWriter(
-        os.path.join(outpath, str(IMSIZE)+'.tfrecords')) as hr_writer, \
-        tf.python_io.TFRecordWriter(
-        os.path.join(outpath, 'embedding.tfrecords')) as embd_writer:
+        os.path.join(outpath, str(LOAD_SIZE)+'.tfrecords')) as hr_writer:
         for i, filename in zip(range(numfiles), filenames):
-            img = cv2.imread(os.path.join(imagepath, filename))
+            img = cv2.imread(os.path.join(imagepath, filename))[:,:,::-1]
             if KEEP_RATIO:
                 h = float(img.shape[0])
                 w = float(img.shape[1])
                 minshape = np.min([h, w])
-                hr_img = cv2.resize(img, (int(IMSIZE*h/minshape), int(IMSIZE*w/minshape)))
-                lr_img = cv2.resize(img, (int(lr_size*h/minshape), int(lr_size*h/minshape)))
+                hr_img = cv2.resize(img,
+                    (int(LOAD_SIZE*w/minshape), int(LOAD_SIZE*h/minshape)),
+                    interpolation=CV_FLAG)
+                lr_img = cv2.resize(img,
+                    (int(lr_size*w/minshape), int(lr_size*h/minshape)),
+                    interpolation=CV_FLAG)
             else:
-                hr_img = cv2.resize(img, (IMSIZE, IMSIZE))
-                lr_img = cv2.resize(img, (lr_size, lr_size))
+                hr_img = cv2.resize(img, (LOAD_SIZE, LOAD_SIZE),
+                    interpolation=CV_FLAG)
+                lr_img = cv2.resize(img, (lr_size, lr_size),
+                    interpolation=CV_FLAG)
                 height = img.shape[0]
 
             t_file = torchfile.load(os.path.join(embeddingpath,
@@ -190,8 +167,10 @@ def test_tfrecords(tfrecords_filename):
 
         img_1d = np.fromstring(img_string, dtype=np.uint8)
         reconstructed_img = img_1d.reshape((height, width, -1))
-        img = cv2.imread(os.path.join(COCO_DIR, 'train2014', filename_string))
-        img = cv2.resize(img, (height, width))
+        img = cv2.imread(os.path.join(\
+            COCO_DIR, 'train2014', filename_string))[:,:,::-1]
+        img = cv2.resize(img, (width, height),
+            interpolation=CV_FLAG)
 
         recon_embd = np.fromstring(embd_string, dtype=np.float32)
         recon_embd = recon_embd.reshape((5, 1024))
@@ -219,6 +198,6 @@ if __name__ == '__main__':
     embed_dir = os.path.join(COCO_DIR, 'train2014_ex_t7')
     save_tfrecords(train_dir, embed_dir, COCO_DIR)
     test_tfrecords(os.path.join(COCO_DIR, '76.tfrecords'))
-    test_tfrecords(os.path.join(COCO_DIR, '256.tfrecords'))
+    test_tfrecords(os.path.join(COCO_DIR, '304.tfrecords'))
 
 
