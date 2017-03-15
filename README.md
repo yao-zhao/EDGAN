@@ -9,7 +9,12 @@ This repository modifies the original StackGAN code
 - Option to train with BGAN
 
 # ToDo List
-- interface for MSCOCO dataset
+## interface for MSCOCO dataset
+- load trained char-CNN-RNN
+- load MSCOO
+- preprocess
+- batch pipline
+
 - Multi Stack tests
 - Transfer learning from trained classifcation
 
@@ -31,4 +36,8 @@ error possible discriminator variable sharing
 - gate gradients -->
 
 
+<!-- 
+notes:
 
+deconv may cause patterns, resize is better
+ -->
