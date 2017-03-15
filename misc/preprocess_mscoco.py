@@ -5,16 +5,19 @@ from __future__ import unicode_literals
 
 # import tensorflow as tf
 import cv2
+import json
 import numpy as np
 import os
 import pickle
 import torchfile
+import tensorflow as tf
 
 LR_HR_RETIO = 4
 IMSIZE = 256
 LOAD_SIZE = int(IMSIZE * 76 / 64)
 COCO_DIR = 'Data/mscoco'
 KEEP_RATIO = False
+ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
 
 def save_data_seperate(inpath, outpath):
     filenames = os.listdir(inpath)
@@ -50,25 +53,24 @@ def save_data_list(inpath, outpath):
     print('number of training images: '+str(len(filenames)))
     lr_size = int(LOAD_SIZE / LR_HR_RETIO)
     numfiles = len(filenames)
-    for i, filename in zip(range(numfiles), filenames):
-        img = cv2.imread(os.path.join(inpath, filename))
-        if KEEP_RATIO:
-            h = float(img.shape[0])
-            w = float(img.shape[1])
-            minshape = np.min([h, w])
-            hr_img = cv2.resize(img, (int(IMSIZE*h/minshape), int(IMSIZE*w/minshape)))
-            lr_img = cv2.resize(img, (int(lr_size*h/minshape), int(lr_size*h/minshape)))
-        else:
-            hr_img = cv2.resize(img, (IMSIZE, IMSIZE))
-            lr_img = cv2.resize(img, (lr_size, lr_size))
-        lr_images.append(lr_img)
-        hr_images.append(hr_img)
-        if i % int(numfiles/100) == 0:
-            print('process %.2f'% (i * 1. / numfiles))
-
-    print('images', len(hr_images), hr_images[0].shape, lr_images[0].shape)
+    with open(outfile, 'wb') as f_out:
+        for i, filename in zip(range(numfiles), filenames):
+            img = cv2.imread(os.path.join(inpath, filename))
+            if KEEP_RATIO:
+                h = float(img.shape[0])
+                w = float(img.shape[1])
+                minshape = np.min([h, w])
+                hr_img = cv2.resize(img, (int(IMSIZE*h/minshape), int(IMSIZE*w/minshape)))
+                lr_img = cv2.resize(img, (int(lr_size*h/minshape), int(lr_size*h/minshape)))
+            else:
+                hr_img = cv2.resize(img, (IMSIZE, IMSIZE))
+                lr_img = cv2.resize(img, (lr_size, lr_size))
+            lr_images.append(lr_img)
+            hr_images.append(hr_img)
+            if i % int(numfiles/100) == 0:
+                print('process %.2f'% (i * 1. / numfiles))
     print('start writing')
-    #
+    
     outfile = outpath + str(LOAD_SIZE) + 'images.pickle'
     with open(outfile, 'wb') as f_out:
         pickle.dump(hr_images, f_out)
@@ -89,22 +91,134 @@ def save_embedding(inpath, outpath):
             t_file = torchfile.load(os.path.join(inpath, filename))
             print('process %.2f'% (i * 1. / numfiles))
 
-    print('images', len(hr_images), hr_images[0].shape, lr_images[0].shape)
-    print('start writing')
-    #
-    outfile = outpath + str(LOAD_SIZE) + 'images.pickle'
-    with open(outfile, 'wb') as f_out:
-        pickle.dump(hr_images, f_out)
-        print('save to: ', outfile)
-    #
-    outfile = outpath + str(lr_size) + 'images.pickle'
-    with open(outfile, 'wb') as f_out:
-        pickle.dump(lr_images, f_out)
-        print('save to: ', outfile)
 
-def convert_birds_dataset_pickle(inpath):
-    train_dir = os.path.join(inpath, 'train2014/')
-    save_data_list(train_dir, inpath)
+def save_tfrecords(imagepath, embeddingpath, outpath):
+
+    filenames = os.listdir(imagepath)
+    filenames.sort()
+    # filenames = filenames[:10]
+    print('number of training images: '+str(len(filenames)))
+    lr_size = int(LOAD_SIZE / LR_HR_RETIO)
+    numfiles = len(filenames)
+    with tf.python_io.TFRecordWriter(
+        os.path.join(outpath, str(lr_size)+'.tfrecords')) as lr_writer, \
+        tf.python_io.TFRecordWriter(
+        os.path.join(outpath, str(IMSIZE)+'.tfrecords')) as hr_writer, \
+        tf.python_io.TFRecordWriter(
+        os.path.join(outpath, 'embedding.tfrecords')) as embd_writer:
+        for i, filename in zip(range(numfiles), filenames):
+            img = cv2.imread(os.path.join(imagepath, filename))
+            if KEEP_RATIO:
+                h = float(img.shape[0])
+                w = float(img.shape[1])
+                minshape = np.min([h, w])
+                hr_img = cv2.resize(img, (int(IMSIZE*h/minshape), int(IMSIZE*w/minshape)))
+                lr_img = cv2.resize(img, (int(lr_size*h/minshape), int(lr_size*h/minshape)))
+            else:
+                hr_img = cv2.resize(img, (IMSIZE, IMSIZE))
+                lr_img = cv2.resize(img, (lr_size, lr_size))
+                height = img.shape[0]
+
+            t_file = torchfile.load(os.path.join(embeddingpath,
+                os.path.splitext(filename)[0]+'.t7'))
+            embedding_str = t_file.txt.tostring()
+
+            lr_example = tf.train.Example(features=tf.train.Features(feature={
+                'height': _int64_feature(lr_img.shape[0]),
+                'width': _int64_feature(lr_img.shape[1]),
+                'image': _bytes_feature(lr_img.tostring()),
+                'filename': _bytes_feature(str(filename)),
+                'embedding': _bytes_feature(embedding_str),
+                 }))
+            lr_writer.write(lr_example.SerializeToString())
+
+            hr_example = tf.train.Example(features=tf.train.Features(feature={
+                'height': _int64_feature(hr_img.shape[0]),
+                'width': _int64_feature(hr_img.shape[1]),
+                'image': _bytes_feature(hr_img.tostring()),
+                'filename': _bytes_feature(str(filename)),
+                'embedding': _bytes_feature(embedding_str),
+                 }))
+            hr_writer.write(hr_example.SerializeToString())
+
+            if i == 0:
+                print("captions: ")
+                for j in range(5):
+                    print(int2alph(t_file.char[:,j].tolist()))
+                print("embedding shape: ")
+                print(t_file.txt.dtype)
+                print(t_file.txt.shape)
+                print("image name: " + t_file.img)
+
+            if i % int(numfiles/100+1) == 0:
+                print('process %.2f'% (i * 1. / numfiles))
+
+def int2alph(intlist):
+    chars = []
+    for i in intlist:
+        if i > 0:
+            chars.append(ALPHABET[i-1])
+    return ''.join(chars)
+
+def _bytes_feature(value):
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+
+def _int64_feature(value):
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+
+def test_tfrecords(tfrecords_filename):
+    count = 0
+    record_iterator = tf.python_io.tf_record_iterator(path=tfrecords_filename)
+    for string_record in record_iterator:
+        example = tf.train.Example()
+        example.ParseFromString(string_record)
+        height = int(example.features.feature['height']
+                                     .int64_list
+                                     .value[0])
+        width = int(example.features.feature['width']
+                                    .int64_list
+                                    .value[0])
+        img_string = (example.features.feature['image']
+                                      .bytes_list
+                                      .value[0])
+        filename_string = (example.features.feature['filename']
+                                    .bytes_list
+                                    .value[0])
+        embd_string = (example.features.feature['embedding']
+                                      .bytes_list
+                                      .value[0])
+
+        img_1d = np.fromstring(img_string, dtype=np.uint8)
+        reconstructed_img = img_1d.reshape((height, width, -1))
+        img = cv2.imread(os.path.join(COCO_DIR, 'train2014', filename_string))
+        img = cv2.resize(img, (height, width))
+
+        recon_embd = np.fromstring(embd_string, dtype=np.float32)
+        recon_embd = recon_embd.reshape((5, 1024))
+        t_file = torchfile.load(os.path.join(COCO_DIR, 'train2014_ex_t7',
+            os.path.splitext(filename_string)[0]+'.t7'))
+        embd = t_file.txt
+        if not np.allclose(img, reconstructed_img) or\
+            not np.allclose(embd, recon_embd):
+            print("image does not match")
+        count += 1
+        if count > 10:
+            break
+    print("tfrecord check test passed for "+tfrecords_filename)
 
 if __name__ == '__main__':
-    convert_birds_dataset_pickle(COCO_DIR)
+
+    #anno = json.loads(open(os.path.join(COCO_DIR, 'annotations',
+    #    'captions_train2014.json')).read())['annotations']
+    #ids = []
+    #captions = []
+    #image_ids = []
+    #ids, captions = [var['image_id'], var['caption'] for var in anno]
+
+    train_dir = os.path.join(COCO_DIR, 'train2014/')
+    embed_dir = os.path.join(COCO_DIR, 'train2014_ex_t7')
+    save_tfrecords(train_dir, embed_dir, COCO_DIR)
+    test_tfrecords(os.path.join(COCO_DIR, '76.tfrecords'))
+    test_tfrecords(os.path.join(COCO_DIR, '256.tfrecords'))
+
+
