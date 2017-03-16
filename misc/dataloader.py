@@ -7,18 +7,34 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 
 class DataLoader():
-    def __init__(self, tfrecord, imsize, sample_embeddings_num=4):
-        self.filename = tfrecord
+    def __init__(self, tfrecord, imsize, sample_embeddings_num=4,
+        num_examples=None):
+        if not isinstance(tfrecord, list): tfrecord = [tfrecord]
+        self.filenames = tfrecord
         self.capacity = 5000
         self.min_after_dequeue = 1000
         self.num_threads = 2
         self.embedding_num = 5
         self.embedding_dim = 1024
+        self.embedding_shape = [self.embedding_dim]
         self.queue = tf.train.string_input_producer(
-            [self.filename], shuffle=True)
+            self.filenames, shuffle=True)
         self.sample_embeddings_num = sample_embeddings_num
-
+        if num_examples is None:
+            self.num_exmaples = self.get_num_exmaples()
+        else:
+            self.num_examples = num_examples
         self.imsize = imsize
+        self.image_shape = imsize + [3]
+
+    def get_num_exmaples(self):
+        print('start counting')
+        count = 0
+        for fn in self.filenames:
+            for record in tf.python_io.tf_record_iterator(fn):
+                count += 1
+        print(count)
+        return count
 
     def sample_embeddings(self, embeddings, sample_num):
         assert len(embeddings.shape) == 2
@@ -33,6 +49,8 @@ class DataLoader():
         image =  tf.random_crop(image,
             tf.stack([self.imsize[0], self.imsize[1], 3]))
         image = tf.image.random_flip_left_right(image)
+        image = tf.to_float(image)
+        image = image/256 - 0.5
         return image
 
     def get_batch(self, batch_size):
@@ -52,10 +70,10 @@ class DataLoader():
         height = tf.cast(features['height'], tf.int32)
         width = tf.cast(features['width'], tf.int32)
 
-        image_shape = tf.stack([height, width, 3])
+        img_shape = tf.stack([height, width, 3])
         embedding_shape = tf.stack([self.embedding_num, self.embedding_dim])
 
-        image = tf.reshape(image, image_shape)
+        image = tf.reshape(image, img_shape)
         embedding = tf.reshape(embedding, embedding_shape)
 
         image = self.image_augmentation(image)
@@ -63,18 +81,21 @@ class DataLoader():
             self.sample_embeddings_num)
 
         images, embeddings = tf.train.shuffle_batch(
-            [image, embedding], batch_size=batch_size,
+            [image, embedding], batch_size=batch_size*2,
             capacity=self.capacity,
             num_threads=self.num_threads,
             min_after_dequeue=self.min_after_dequeue)
 
-        return images, embeddings
+        real_images = images[:batch_size,:,:,:]
+        wrong_images = images[batch_size:,:,:,:]
+        embeddings = embeddings[:batch_size,:]
+        return real_images, wrong_images, embeddings
 
 def test():
-    dl = DataLoader('Data/mscoco/76.tfrecords', (64, 64))
-    dl.capacity = 128
-    dl.min_after_dequeue = 64
-    images, embeddings = dl.get_batch(6)
+    dl = DataLoader('Data/mscoco/76.tfrecords', [64, 64], num_examples=82783)
+    # dl.capacity = 1000
+    # dl.min_after_dequeue = 500
+    images, wrong_images, embeddings = dl.get_batch(6)
     init_op = tf.group(tf.global_variables_initializer(),
         tf.local_variables_initializer())
 
@@ -83,7 +104,12 @@ def test():
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(coord=coord)
         for i in xrange(3):
-            img, anno = sess.run([images, embeddings])
+            img, anno, = sess.run([images, embeddings])
+            # numr, numw = sess.run([
+            #     dl.reader.num_records_produced(),
+            #     dl.reader.num_work_units_completed()])
+            # print(numr)
+            # print(numw)
             plt.imshow(img[0, :, :, :])
             print(img.shape)
             print(embeddings.shape)
