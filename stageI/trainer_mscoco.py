@@ -35,10 +35,10 @@ class CondGANTrainer_mscoco(CondGANTrainer):
         with tf.variable_scope('duplicate_embedding'):
             embed = self.duplicate_input(self.embeddings, cfg.TRAIN.NUM_COPY)
         c, _ = self.sample_encoded_context(embed)
-        if cfg.TRAIN.FLAG:
-            z = tf.zeros([self.batch_size, cfg.Z_DIM])  # Expect similar BGs
-        else:
-            z = tf.random_normal([self.batch_size, cfg.Z_DIM])
+        # if cfg.TRAIN.FLAG:
+        #     z = tf.zeros([self.batch_size, cfg.Z_DIM])  # Expect similar BGs
+        # else:
+        z = tf.random_normal([self.batch_size, cfg.Z_DIM])
         self.fake_images = self.model.get_generator(tf.concat([c, z], 1))
 
 
