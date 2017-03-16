@@ -50,7 +50,7 @@ class DataLoader():
             tf.stack([self.imsize[0], self.imsize[1], 3]))
         image = tf.image.random_flip_left_right(image)
         image = tf.to_float(image)
-        image = image/256 - 0.5
+        image = 2*image/256 - 1
         return image
 
     def get_batch(self, batch_size):
