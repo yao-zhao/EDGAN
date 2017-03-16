@@ -16,7 +16,9 @@ __C.CONFIG_NAME = ''
 __C.GPU_ID = 0
 __C.Z_DIM = 100
 __C.DATASET = edict()
-__C.DATASET.NUM_EXAMPLES = 82783
+__C.DATASET.NUM_EXAMPLES = -1
+__C.DATASET.TFRECORDS = '76_indoor'
+
 
 # Demo/test options
 __C.TEST = edict()
@@ -32,6 +34,7 @@ __C.TEST.CAPTION_PATH = ''
 # Training options
 __C.TRAIN = edict()
 __C.TRAIN.FLAG = True
+__C.TRAIN.LR_IMSIZE = 64
 __C.TRAIN.GAN_TYPE = 'LSGAN' #'BGAN', 'GAN', 'LSGAN', 'WGAN'
 __C.TRAIN.WEIGHT_CLIP = 0.01
 __C.TRAIN.CRITIC_PER_GENERATION = 1

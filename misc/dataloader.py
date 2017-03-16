@@ -20,12 +20,14 @@ class DataLoader():
         self.queue = tf.train.string_input_producer(
             self.filenames, shuffle=True)
         self.sample_embeddings_num = sample_embeddings_num
-        if num_examples is None:
-            self.num_exmaples = self.get_num_exmaples()
+        if num_examples <= 0:
+            self.num_examples = self.get_num_exmaples()
         else:
             self.num_examples = num_examples
         self.imsize = imsize
         self.image_shape = imsize + [3]
+        print('Dataset %s loaded with %d examples' % \
+            (' '.join(tfrecord), self.num_examples))
 
     def get_num_exmaples(self):
         print('start counting')
@@ -33,7 +35,6 @@ class DataLoader():
         for fn in self.filenames:
             for record in tf.python_io.tf_record_iterator(fn):
                 count += 1
-        print(count)
         return count
 
     def sample_embeddings(self, embeddings, sample_num):

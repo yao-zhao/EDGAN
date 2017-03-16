@@ -22,12 +22,6 @@ def parse_args():
     parser.add_argument('--gpu', dest='gpu_id',
                         help='GPU device id to use [0]',
                         default=-1, type=int)
-    parser.add_argument('--imsize', dest='crop_size',
-                        help='Crop image to size',
-                        default=64, type=int)
-    parser.add_argument('--path', dest='tfrecord_path',
-                        help='tfrecords path to load',
-                        default='Data/mscoco/76.tfrecords', type=str)
     args = parser.parse_args()
     return args
 
@@ -39,17 +33,16 @@ if __name__ == "__main__":
         cfg.GPU_ID = args.gpu_id
     print('Using config:')
     pprint.pprint(cfg)
-    crop_size = args.crop_size
-    tfrecord_path = args.tfrecord_path
 
     now = datetime.datetime.now(dateutil.tz.tzlocal())
     timestamp = now.strftime('%Y_%m_%d_%H_%M_%S')
 
-    datadir = 'Data/%s' % cfg.DATASET_NAME
+    tfrecord_path = 'Data/%s/%s.tfrecords' % \
+        (cfg.DATASET_NAME, cfg.DATASET.TFRECORDS)
+    crop_size = cfg.TRAIN.LR_IMSIZE
     dataset = DataLoader(tfrecord_path, [crop_size, crop_size],
         num_examples=cfg.DATASET.NUM_EXAMPLES)
     if cfg.TRAIN.FLAG:
-        filename_train = '%s/train' % (datadir)
         ckt_logs_dir = "ckt_logs/%s/%s_%s" % \
             (cfg.DATASET_NAME, cfg.CONFIG_NAME, timestamp)
         mkdir_p(ckt_logs_dir)

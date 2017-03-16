@@ -5,6 +5,10 @@ EMBEDDING_TYPE: 'cnn-rnn'
 GPU_ID: 0
 Z_DIM: 100
 
+DATASET:
+    NUM_EXAMPLES: -1
+    TFRECORDS: '76_indoor'
+
 TRAIN:
     GAN_TYPE: 'LSGAN'
     FLAG: True
