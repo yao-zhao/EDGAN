@@ -30,6 +30,17 @@ class CondGANTrainer_mscoco(CondGANTrainer):
             name='discriminator_learning_rate'
         )
 
+
+    def sampler(self):
+        c, _ = self.sample_encoded_context(\
+            self.duplicate_input(self.embeddings, cfg.TRAIN.NUM_COPY))
+        if cfg.TRAIN.FLAG:
+            z = tf.zeros([self.batch_size, cfg.Z_DIM])  # Expect similar BGs
+        else:
+            z = tf.random_normal([self.batch_size, cfg.Z_DIM])
+        self.fake_images = self.model.get_generator(tf.concat([c, z], 1))
+
+
     def train(self):
         config = tf.ConfigProto(allow_soft_placement=True)
         with tf.Session(config=config) as sess:
@@ -47,6 +58,9 @@ class CondGANTrainer_mscoco(CondGANTrainer):
             tf.summary.merge_all()
             summary_writer = tf.summary.FileWriter(self.log_dir,
                                                     sess.graph)
+            img_sum = self.epoch_sum_images(sess, \
+                cfg.TRAIN.NUM_COPY, -1)
+            summary_writer.add_summary(img_sum, -1)
 
             keys = ["d_loss", "g_loss"]
             log_vars = []
@@ -130,25 +144,45 @@ class CondGANTrainer_mscoco(CondGANTrainer):
             coord.join(threads)
 
 
+    def visualize_one_superimage(self, fake_images, real_images,
+        n, filename):
+        stacked_img = []
+        for row in range(n):
+            row_img = [real_images[row * n, :, :, :]]
+            for col in range(n):
+                row_img.append(fake_images[row * n + col, :, :, :])
+            # each rows is 1realimage +10_fakeimage
+            stacked_img.append(tf.concat(row_img, 1))
+        superimages = tf.expand_dims(tf.concat(stacked_img, 0), 0)
+        current_img_summary = tf.summary.image(filename, superimages)
+        return current_img_summary, superimages
+
+
     def visualization(self, n):
+        images_train = self.duplicate_input(self.images, n)
         fake_sum_train, superimage_train = \
             self.visualize_one_superimage(self.fake_images[:n * n],
-                                          self.images[:n * n],
+                                          images_train[:n * n],
                                           n, "train")
         self.superimages = superimage_train
         self.image_summary = tf.summary.merge([fake_sum_train])
 
+    def duplicate_input(self, x, n):
+        with tf.variable_scope('duplicate_input'):
+            assert n*n < self.batch_size
+            xlist = []
+            for i in range(n):
+                for j in range(n):
+                    xlist.append(tf.gather(x, tf.stack([i*n])))
+            pad = tf.gather(x, tf.stack(list(range(self.batch_size-n*n))))
+            out = tf.concat([tf.concat(xlist, 0), pad], 0)
+        return out
+
     def epoch_sum_images(self, sess, n, epoch):
-        images_train, _, embeddings_train =\
-            self.get_batch(n * n)
-        images_train = self.preprocess(images_train, n)
-        embeddings_train = self.preprocess(embeddings_train, n)
-
-        feed_dict = {self.images: images_train,
-                     self.embeddings: embeddings_train}
         gen_samples, img_summary =\
-            sess.run([self.superimages, self.image_summary], feed_dict)
+            sess.run([self.superimages, self.image_summary])
 
-        scipy.misc.imsave('%s/train_%d.jpg' % (self.log_dir, epoch), gen_samples[0])
+        scipy.misc.imsave(\
+            '%s/train_%d.jpg' % (self.log_dir, epoch), gen_samples[0])
 
         return img_summary
