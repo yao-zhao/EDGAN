@@ -13,6 +13,9 @@ This repository modifies the original StackGAN code
 
 # ToDo List
 - better deal with negative sample problem
+- go over json
+- select fewer class for mscoco?
+- yelp data set?
 - Multi Stack tests
 - Transfer learning from trained classifcation to form intermediate map
 

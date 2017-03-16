@@ -5,10 +5,9 @@ from __future__ import unicode_literals
 
 # import tensorflow as tf
 import cv2
-import json
 import numpy as np
 import os
-import pickle
+from pycocotools.coco import COCO
 import torchfile
 import tensorflow as tf
 
@@ -22,6 +21,7 @@ CV_FLAG = cv2.INTER_LINEAR
 DEBUG = False
 
 def save_data_seperate(inpath, outpath):
+    raise NotImplementedError    
     filenames = os.listdir(inpath)
     filenames.sort()
     print('number of training images: '+str(len(filenames)))
@@ -52,9 +52,25 @@ def save_data_seperate(inpath, outpath):
                 interpolation=CV_FLAG)
             cv2.imwrite(os.path.join(lr_path, filename), img)
             print(filename)
-
+            
+def get_ImageIds(annFile, selected_supers):    
+    coco=COCO(annFile)
+    cats = coco.loadCats(coco.getCatIds())
+    selected_subs = []
+    for cat in cats:
+        if cat['supercategory'] in selected_supers:
+            selected_subs.append(str(cat['name']))
+    print('chosen sub classes: '+''.join(selected_subs))
+    imgIds = []
+    for sub in selected_subs:
+        catIds = coco.getCatIds(catNms=sub);
+        imgIds.extend(coco.getImgIds(catIds=catIds))
+        imgIds = list(np.unique(imgIds))
+        image_names = [img['file_name'] for img in coco.loadImgs(imgIds)]
+    return image_names
 
 def save_embedding(inpath, outpath):
+    raise NotImplementedError    
     filenames = os.listdir(inpath)
     filenames.sort()
     print('number of training images: '+str(len(filenames)))
@@ -65,18 +81,21 @@ def save_embedding(inpath, outpath):
             print('process %.2f'% (i * 1. / numfiles))
 
 
-def save_tfrecords(imagepath, embeddingpath, outpath):
-
-    filenames = os.listdir(imagepath)
-    filenames.sort()
+def save_tfrecords(imagepath, embeddingpath, outpath,
+                   annoFile=None, selected_supers=None, tag=''):
+    if annoFile is None or selected_supers is None:
+        filenames = os.listdir(imagepath)
+        filenames.sort()
+    else:
+        filenames = get_ImageIds(annoFile, selected_supers)
     if DEBUG: filenames = filenames[:100]
     print('number of training images: '+str(len(filenames)))
     lr_size = int(LOAD_SIZE / LR_HR_RETIO)
     numfiles = len(filenames)
     with tf.python_io.TFRecordWriter(
-        os.path.join(outpath, str(lr_size)+'.tfrecords')) as lr_writer, \
+        os.path.join(outpath, str(lr_size)+tag+'.tfrecords')) as lr_writer, \
         tf.python_io.TFRecordWriter(
-        os.path.join(outpath, str(LOAD_SIZE)+'.tfrecords')) as hr_writer:
+        os.path.join(outpath, str(LOAD_SIZE)+tag+'.tfrecords')) as hr_writer:
         for i, filename in zip(range(numfiles), filenames):
             img = cv2.imread(os.path.join(imagepath, filename))[:,:,::-1]
             if KEEP_RATIO:
@@ -94,7 +113,6 @@ def save_tfrecords(imagepath, embeddingpath, outpath):
                     interpolation=CV_FLAG)
                 lr_img = cv2.resize(img, (lr_size, lr_size),
                     interpolation=CV_FLAG)
-                height = img.shape[0]
 
             t_file = torchfile.load(os.path.join(embeddingpath,
                 os.path.splitext(filename)[0]+'.t7'))
@@ -186,17 +204,13 @@ def test_tfrecords(tfrecords_filename):
     print("tfrecord check test passed for "+tfrecords_filename)
 
 if __name__ == '__main__':
-
-    #anno = json.loads(open(os.path.join(COCO_DIR, 'annotations',
-    #    'captions_train2014.json')).read())['annotations']
-    #ids = []
-    #captions = []
-    #image_ids = []
-    #ids, captions = [var['image_id'], var['caption'] for var in anno]
-
     train_dir = os.path.join(COCO_DIR, 'train2014/')
     embed_dir = os.path.join(COCO_DIR, 'train2014_ex_t7')
-    save_tfrecords(train_dir, embed_dir, COCO_DIR)
+    selected_supers = \
+        ['kitchen', 'indoor', 'electronic', 'furniture', 'appliance']
+    save_tfrecords(train_dir, embed_dir, COCO_DIR, tag='_indoor',
+        annoFile=os.path.join(COCO_DIR, 'annotations', 'instances_train2014.json'),
+        selected_supers=selected_supers)
     test_tfrecords(os.path.join(COCO_DIR, '76.tfrecords'))
     test_tfrecords(os.path.join(COCO_DIR, '304.tfrecords'))
 
