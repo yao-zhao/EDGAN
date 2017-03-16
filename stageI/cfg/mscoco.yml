@@ -6,6 +6,7 @@ GPU_ID: 0
 Z_DIM: 100
 
 TRAIN:
+    GAN_TYPE: 'LSGAN'
     FLAG: True
     PRETRAINED_MODEL: ''
     BATCH_SIZE: 64
