@@ -123,16 +123,17 @@ class CondGAN(object):
             (node1_0.
              custom_conv2d(self.gf_dim * 2, k_h=1, k_w=1, d_h=1, d_w=1).
              conv_batch_norm().
-             apply(tf.nn.relu).
+             apply(leaky_rectify, leakiness=0.2).
              custom_conv2d(self.gf_dim * 2, k_h=3, k_w=3, d_h=1, d_w=1).
              conv_batch_norm().
-             apply(tf.nn.relu).
+             apply(leaky_rectify, leakiness=0.2).
              custom_conv2d(self.gf_dim * 8, k_h=3, k_w=3, d_h=1, d_w=1).
              conv_batch_norm())
         node1 = \
             (node1_0.
              apply(tf.add, node1_1).
-             apply(tf.nn.relu))
+             apply(leaky_rectify, leakiness=0.2)
+             )
 
         node2_0 = \
             (node1.
@@ -143,16 +144,17 @@ class CondGAN(object):
             (node2_0.
              custom_conv2d(self.gf_dim * 1, k_h=1, k_w=1, d_h=1, d_w=1).
              conv_batch_norm().
-             apply(tf.nn.relu).
+             apply(leaky_rectify, leakiness=0.2).
              custom_conv2d(self.gf_dim * 1, k_h=3, k_w=3, d_h=1, d_w=1).
              conv_batch_norm().
-             apply(tf.nn.relu).
+             apply(leaky_rectify, leakiness=0.2).
              custom_conv2d(self.gf_dim * 4, k_h=3, k_w=3, d_h=1, d_w=1).
              conv_batch_norm())
         node2 = \
             (node2_0.
              apply(tf.add, node2_1).
-             apply(tf.nn.relu))
+             apply(leaky_rectify, leakiness=0.2)
+             )
 
         node3_0 = \
             (node2.
@@ -163,16 +165,17 @@ class CondGAN(object):
             (node3_0.
              custom_conv2d(self.gf_dim / 2, k_h=1, k_w=1, d_h=1, d_w=1).
              conv_batch_norm().
-             apply(tf.nn.relu).
+             apply(leaky_rectify, leakiness=0.2).
              custom_conv2d(self.gf_dim / 2, k_h=3, k_w=3, d_h=1, d_w=1).
              conv_batch_norm().
-             apply(tf.nn.relu).
+             apply(leaky_rectify, leakiness=0.2).
              custom_conv2d(self.gf_dim * 2, k_h=3, k_w=3, d_h=1, d_w=1).
              conv_batch_norm())
         node3 = \
             (node3_0.
              apply(tf.add, node3_1).
-             apply(tf.nn.relu))
+             apply(leaky_rectify, leakiness=0.2)
+             )
 
         node4_0 = \
             (node3.
@@ -183,16 +186,17 @@ class CondGAN(object):
             (node4_0.
              custom_conv2d(self.gf_dim / 4, k_h=1, k_w=1, d_h=1, d_w=1).
              conv_batch_norm().
-             apply(tf.nn.relu).
+             apply(leaky_rectify, leakiness=0.2).
              custom_conv2d(self.gf_dim / 4, k_h=3, k_w=3, d_h=1, d_w=1).
              conv_batch_norm().
-             apply(tf.nn.relu).
+             apply(leaky_rectify, leakiness=0.2).
              custom_conv2d(self.gf_dim, k_h=3, k_w=3, d_h=1, d_w=1).
              conv_batch_norm())
         node4 = \
             (node4_0.
              apply(tf.add, node4_1).
-             apply(tf.nn.relu))
+             apply(leaky_rectify, leakiness=0.2)
+             )
 
         output_tensor = \
             (node4.

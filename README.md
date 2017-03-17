@@ -36,6 +36,7 @@ for selected supercategory
 - yelp data set?
 - Multi Stack tests
 - Transfer learning from trained classifcation to form intermediate map
+- change to leaky relu in generator
 
 # Test results
 - WGAN, takes longer to train, unclear about improvements
