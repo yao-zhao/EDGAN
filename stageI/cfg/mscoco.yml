@@ -23,7 +23,10 @@ TRAIN:
     NUM_EMBEDDING: 4
     COEFF:
       KL: 2.0
-
+    WGAN:
+        WEIGHT_CLIP:
+            VALUE: 0.01
+            METHOD: 'all'
 GAN:
     EMBEDDING_DIM: 128
     DF_DIM: 64

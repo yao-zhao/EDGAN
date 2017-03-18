@@ -196,11 +196,19 @@ class CondGANTrainer(object):
                 name = 'd_opt')
             with tf.variable_scope('weight_clips'):
                 weight_clip_op = []
-                wc_vars = [var for var in all_vars if 'output_f' in var.name]
+                if cfg.TRAIN.WGAN.WEIGHT_CLIP.METHOD == 'all':
+                    wc_vars = [var for var in all_vars \
+                        if var.name.startswith('d_')]
+                elif cfg.TRAIN.WGAN.WEIGHT_CLIP.METHOD == 'last':
+                    wc_vars = [var for var in all_vars \
+                        if 'output_f' in var.name]
+                else:
+                    raise NotImplementedError
                 for wc_var in wc_vars:
                     weight_clip_op.append(tf.assign(wc_var,
                         tf.clip_by_value(wc_var,
-                        -cfg.TRAIN.WEIGHT_CLIP, cfg.TRAIN.WEIGHT_CLIP)))
+                        -cfg.TRAIN.WGAN.WEIGHT_CLIP.VALUE,
+                        cfg.TRAIN.WGAN.WEIGHT_CLIP.VALUE)))
             self.weight_clip_op = weight_clip_op
         else:
             generator_opt = tf.train.AdamOptimizer(self.generator_lr,
