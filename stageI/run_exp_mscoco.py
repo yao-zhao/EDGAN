@@ -6,6 +6,8 @@ import dateutil.tz
 import datetime
 import argparse
 import pprint
+from shutil import copyfile
+import os
 
 from misc.dataloader import DataLoader
 from stageI.model import CondGAN
@@ -53,6 +55,8 @@ if __name__ == "__main__":
     model = CondGAN(
         image_shape=dataset.image_shape
     )
+
+    copyfile(os.path.join('stageI', 'cfg', 'mscoco.yml'), os.path.join(ckt_logs_dir, 'mscoco.yml'))
 
     algo = CondGANTrainer_mscoco(
         model=model,
