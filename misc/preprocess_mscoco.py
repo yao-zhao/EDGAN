@@ -19,6 +19,8 @@ KEEP_RATIO = True
 ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
 CV_FLAG = cv2.INTER_LINEAR
 DEBUG = False
+FILTER_ASPECT_RATIO = True
+ASPECT_RATIO = 9/16
 
 def save_data_seperate(inpath, outpath):
     raise NotImplementedError    
@@ -65,8 +67,18 @@ def get_ImageIds(annFile, selected_supers):
     for sub in selected_subs:
         catIds = coco.getCatIds(catNms=sub);
         imgIds.extend(coco.getImgIds(catIds=catIds))
-        imgIds = list(np.unique(imgIds))
-        image_names = [img['file_name'] for img in coco.loadImgs(imgIds)]
+    imgIds = list(np.unique(imgIds))
+    all_count = len(imgIds)
+    image_names = []
+    for img in coco.loadImgs(imgIds):
+        if FILTER_ASPECT_RATIO is True:
+            aspect_ratio = img['height']/img['width']
+            if aspect_ratio >= ASPECT_RATIO and aspect_ratio <= 1/ASPECT_RATIO:
+                image_names.append(img['file_name'])
+        else:
+            image_names.append(img['file_name'])
+    print('%0.2f percent images left after aspect ratio filtering' \
+        % (len(image_names) / float(len(imgIds))))
     return image_names
 
 def save_embedding(inpath, outpath):
@@ -140,7 +152,7 @@ def save_tfrecords(imagepath, embeddingpath, outpath,
                 print("captions: ")
                 for j in range(5):
                     print(int2alph(t_file.char[:,j].tolist()))
-                print("embedding shape: ")
+                print("embedding shape:")
                 print(t_file.txt.dtype)
                 print(t_file.txt.shape)
                 print("image name: " + t_file.img)
@@ -208,7 +220,7 @@ if __name__ == '__main__':
     embed_dir = os.path.join(COCO_DIR, 'train2014_ex_t7')
     selected_supers = \
         ['furniture', 'appliance']
-    save_tfrecords(train_dir, embed_dir, COCO_DIR, tag='_indoor3',
+    save_tfrecords(train_dir, embed_dir, COCO_DIR, tag='_fur_app',
         annoFile=os.path.join(COCO_DIR, 'annotations', 'instances_train2014.json'),
         selected_supers=selected_supers)
     test_tfrecords(os.path.join(COCO_DIR, '76.tfrecords'))
