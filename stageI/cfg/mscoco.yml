@@ -7,7 +7,7 @@ Z_DIM: 100
 
 DATASET:
     NUM_EXAMPLES: -1
-    TFRECORDS: '76_indoor'
+    TFRECORDS: '76_indoor2'
 
 TRAIN:
     GAN_TYPE: 'WGAN'

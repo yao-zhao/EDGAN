@@ -60,7 +60,7 @@ def get_ImageIds(annFile, selected_supers):
     for cat in cats:
         if cat['supercategory'] in selected_supers:
             selected_subs.append(str(cat['name']))
-    print('chosen sub classes: '+''.join(selected_subs))
+    print('chosen sub classes: '+' '.join(selected_subs))
     imgIds = []
     for sub in selected_subs:
         catIds = coco.getCatIds(catNms=sub);
@@ -207,8 +207,8 @@ if __name__ == '__main__':
     train_dir = os.path.join(COCO_DIR, 'train2014/')
     embed_dir = os.path.join(COCO_DIR, 'train2014_ex_t7')
     selected_supers = \
-        ['kitchen', 'indoor', 'electronic', 'furniture', 'appliance']
-    save_tfrecords(train_dir, embed_dir, COCO_DIR, tag='_indoor',
+        ['furniture', 'appliance']
+    save_tfrecords(train_dir, embed_dir, COCO_DIR, tag='_indoor3',
         annoFile=os.path.join(COCO_DIR, 'annotations', 'instances_train2014.json'),
         selected_supers=selected_supers)
     test_tfrecords(os.path.join(COCO_DIR, '76.tfrecords'))
