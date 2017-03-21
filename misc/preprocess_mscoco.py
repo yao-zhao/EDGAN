@@ -18,7 +18,9 @@ COCO_DIR = 'Data/mscoco'
 KEEP_RATIO = True
 ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
 CV_FLAG = cv2.INTER_CUBIC
+# CV_FLAG = cv2.INTER_LINEAR
 DEBUG = False
+# DEBUG = True
 FILTER_ASPECT_RATIO = True
 ASPECT_RATIO = 9/16
 
@@ -223,7 +225,7 @@ if __name__ == '__main__':
     save_tfrecords(train_dir, embed_dir, COCO_DIR, tag='_fur_app',
         annoFile=os.path.join(COCO_DIR, 'annotations', 'instances_train2014.json'),
         selected_supers=selected_supers)
-    test_tfrecords(os.path.join(COCO_DIR, '76.tfrecords'))
-    test_tfrecords(os.path.join(COCO_DIR, '304.tfrecords'))
+    # test_tfrecords(os.path.join(COCO_DIR, '76.tfrecords'))
+    # test_tfrecords(os.path.join(COCO_DIR, '304.tfrecords'))
 
 
