@@ -1,3 +1,5 @@
+from __future__ import division
+from __future__ import print_function
 
 import sys
 sys.path.append('/home/yz/caffe2/python')
@@ -44,7 +46,8 @@ def _get_caffename_from_tf(tfname):
 def transfer_from_caffenet(\
         model_def = 'models/resnet/ResNet-50-deploy.prototxt',
         model_weights = 'models/resnet/ResNet-50-model.caffemodel',
-        checkpoint_file = 'models/resnet/ResNet-50-transfer.ckpt'):
+        checkpoint_file = 'models/resnet/ResNet-50-transfer.ckpt',
+        num_output = 80):
     with tf.Graph().as_default():
         with  tf.device('/cpu:0'):
             # load inference model
@@ -84,7 +87,7 @@ def transfer_from_caffenet(\
         print('model saved')
 
 def main(argv=None):  # pylint: disable=unused-argument
-    transfer_from_caffenet()
+    transfer_from_caffenet(num_output=80)
 
 if __name__ == '__main__':
     tf.app.run()

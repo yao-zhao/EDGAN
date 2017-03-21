@@ -23,6 +23,7 @@ class DataLoader():
         self.image_shape = imsize + [3]
         print('Dataset %s loaded with %d examples' % \
             (' '.join(tfrecord), self.num_examples))
+        self.BGR_MEAN = tf.stack([103.939, 116.779, 123.68])
 
     def get_num_exmaples(self):
         print('start counting')
@@ -33,6 +34,7 @@ class DataLoader():
         return count
 
     def image_augmentation(self, image):
+        image = tf.subtract(image, self.BGR_MEAN)
         image =  tf.random_crop(image,
             tf.stack([self.imsize[0], self.imsize[1], 3]))
         image = tf.image.random_flip_left_right(image)
@@ -53,6 +55,8 @@ class DataLoader():
 
         image = tf.decode_raw(features['image'], tf.uint8)
         label = tf.decode_raw(features['labels'], tf.uint8)
+        label = tf.cast(label, tf.float32)
+        image = tf.cast(image, tf.float32)
         area = tf.decode_raw(features['areas'], tf.float32)
 
         height = tf.cast(features['height'], tf.int32)
@@ -77,7 +81,7 @@ class DataLoader():
 
 def test():
     dl = DataLoader('Data/mscoco/classification_val.tfrecords',
-        [224, 224], num_examples=82783)
+        [224, 224], num_examples=None)
     images, labels, areas = dl.get_batch(6)
     init_op = tf.group(tf.global_variables_initializer(),
         tf.local_variables_initializer())

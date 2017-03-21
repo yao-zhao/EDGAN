@@ -155,7 +155,7 @@ def dropout(x, keep_prob):
 
 # euclidean loss
 def mean_squared_loss(outputs, labels):
-    loss = tf.reduce_mean(tf.squared_difference(outputs, labels))
+    loss = tf.reduce_mean(tf.square(outputs - labels))
     tf.add_to_collection(FLAGS.LOSSES_COLLECTION, loss)
     return loss
     
