@@ -13,7 +13,7 @@ class DataLoader():
         self.filenames = tfrecord
         self.capacity = 5000
         self.min_after_dequeue = 1000
-        self.num_threads = 2
+        self.num_threads = 4
         self.embedding_num = 5
         self.embedding_dim = 1024
         self.embedding_shape = [self.embedding_dim]
