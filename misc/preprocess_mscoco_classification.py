@@ -27,19 +27,20 @@ def get_cat_indices(coco):
     indices = np.zeros((np.max(cat_ids)+1), np.int) - 1
     for cat_id, i in zip(cat_ids, range(numcats)):
         indices[cat_id] = i
+    print('total of %d categories' % (numcats))
     return indices, numcats
 
 def get_labels(coco, img, indices, numcats):
     img_area = float(img['height'] * img['width'])
     annIds = coco.getAnnIds(imgIds=img['id'], iscrowd=None)
     annotations = coco.loadAnns(annIds)
-    labels = np.zeros((numcats), np.int64)
+    labels = np.zeros((numcats), np.bool)
     areas = np.zeros((numcats), np.float32)
     for annotation in annotations:
         cat_id = annotation['category_id']
-        labels[indices[cat_id]] = 1
+        labels[indices[cat_id]] = True
         areas[indices[cat_id]] += annotation['area'] / img_area
-    labels[areas < AREA_TH] = 0 # set things two small to zero
+    labels[areas < AREA_TH] = False # set things two small to zero
     return labels, areas
          
 def get_ImageIds(coco, selected_supers):
@@ -141,7 +142,7 @@ def test_tfrecords(tfrecords_filename):
         areas = np.fromstring(area_string, dtype=np.float32)
         reconstructed_img = img_1d.reshape((height, width, -1))
         img = cv2.imread(os.path.join(\
-            COCO_DIR, 'train2014', filename_string))[:,:,::-1]
+            COCO_DIR, 'train2014', filename_string)) # BGR do not reverse for transfered resnet
         img = cv2.resize(img, (width, height),
             interpolation=CV_FLAG)
         print(labels)
