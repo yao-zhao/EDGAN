@@ -19,6 +19,7 @@ DEBUG = False
 FILTER_ASPECT_RATIO = True
 ASPECT_RATIO = 9/16 # < 1
 AREA_TH = 0.001
+VAL_RATIO = 0.1
 
 def get_cat_indices(coco):
     cat_ids = coco.getCatIds()
@@ -41,7 +42,7 @@ def get_labels(coco, img, indices, numcats):
     labels[areas < AREA_TH] = 0 # set things two small to zero
     return labels, areas
          
-def get_ImageIds(coco, selected_supers):    
+def get_ImageIds(coco, selected_supers):
     cats = coco.loadCats(coco.getCatIds())
     selected_subs = []
     for cat in cats:
@@ -63,7 +64,10 @@ def save_tfrecords(coco, imagepath, outpath, tag=''):
     numfiles = len(img_formats)
     indices, numcats = get_cat_indices(coco)
     with tf.python_io.TFRecordWriter(
-        os.path.join(outpath, tag+'.tfrecords')) as hr_writer:
+        os.path.join(outpath, tag+'_train.tfrecords')) as train_writer, \
+        tf.python_io.TFRecordWriter(
+            os.path.join(outpath, tag+'_val.tfrecords')) as val_writer:
+        count = 0
         for i, img_format in zip(range(numfiles), img_formats):
 
             if FILTER_ASPECT_RATIO is True:
@@ -92,7 +96,11 @@ def save_tfrecords(coco, imagepath, outpath, tag=''):
                 'labels': _bytes_feature(labels.tostring()),
                 'areas': _bytes_feature(areas.tostring())
                  }))
-            hr_writer.write(hr_example.SerializeToString())
+            count += 1
+            if count % 100 <= 100 * VAL_RATIO:
+                val_writer.write(hr_example.SerializeToString())
+            else:
+                train_writer.write(hr_example.SerializeToString())
             if i % int(numfiles/100+1) == 0:
                 print('process %.2f'% (i * 1. / numfiles))
 
@@ -151,5 +159,5 @@ if __name__ == '__main__':
     coco=COCO(annFile)
     train_dir = os.path.join(COCO_DIR, 'train2014')
     save_tfrecords(coco, train_dir, COCO_DIR, tag='classfication')
-    test_tfrecords(os.path.join(COCO_DIR, 'classfication.tfrecords'))
+    test_tfrecords(os.path.join(COCO_DIR, 'classfication_val.tfrecords'))
 
