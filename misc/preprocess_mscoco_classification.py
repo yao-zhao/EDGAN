@@ -34,13 +34,13 @@ def get_labels(coco, img, indices, numcats):
     img_area = float(img['height'] * img['width'])
     annIds = coco.getAnnIds(imgIds=img['id'], iscrowd=None)
     annotations = coco.loadAnns(annIds)
-    labels = np.zeros((numcats), np.bool)
+    labels = np.zeros((numcats), np.uint8)
     areas = np.zeros((numcats), np.float32)
     for annotation in annotations:
         cat_id = annotation['category_id']
-        labels[indices[cat_id]] = True
+        labels[indices[cat_id]] = 1
         areas[indices[cat_id]] += annotation['area'] / img_area
-    labels[areas < AREA_TH] = False # set things two small to zero
+    labels[areas < AREA_TH] = 0 # set things two small to zero
     return labels, areas
          
 def get_ImageIds(coco, selected_supers):
@@ -74,7 +74,7 @@ def save_tfrecords(coco, imagepath, outpath, tag=''):
             if FILTER_ASPECT_RATIO is True:
                 aspect_ratio = img_format['height']/img_format['width']
                 if aspect_ratio < ASPECT_RATIO or aspect_ratio > 1/ASPECT_RATIO:
-                    continue          
+                    continue
 
             filename = img_format['file_name']
             img = cv2.imread(os.path.join(imagepath, filename))[:,:,::-1]
@@ -159,6 +159,6 @@ if __name__ == '__main__':
     annFile = os.path.join(COCO_DIR, 'annotations/instances_train2014.json')
     coco=COCO(annFile)
     train_dir = os.path.join(COCO_DIR, 'train2014')
-    save_tfrecords(coco, train_dir, COCO_DIR, tag='classfication')
-    test_tfrecords(os.path.join(COCO_DIR, 'classfication_val.tfrecords'))
+    save_tfrecords(coco, train_dir, COCO_DIR, tag='classification')
+    test_tfrecords(os.path.join(COCO_DIR, 'classification_val.tfrecords'))
 
