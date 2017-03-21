@@ -17,7 +17,7 @@ LOAD_SIZE = int(IMSIZE * 76 / 64)
 COCO_DIR = 'Data/mscoco'
 KEEP_RATIO = True
 ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
-CV_FLAG = cv2.INTER_LINEAR
+CV_FLAG = cv2.INTER_CUBIC
 DEBUG = False
 FILTER_ASPECT_RATIO = True
 ASPECT_RATIO = 9/16
