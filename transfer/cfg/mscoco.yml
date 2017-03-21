@@ -1,0 +1,17 @@
+CONFIG_NAME: 'transfer'
+
+DATASET_NAME: 'mscoco'
+GPU_ID: 0
+
+DATASET:
+    TFRECORDS: 'classification'
+
+TRAIN:
+    FLAG: True
+    PRETRAINED_MODEL: ''
+    BATCH_SIZE: 64
+    MAX_EPOCH: 1000
+    SNAPSHOT_INTERVAL: 2000
+    LR: 0.0002
+    LR_DECAY_EPOCH: 200
+    NUM_EMBEDDING: 4

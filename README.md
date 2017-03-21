@@ -58,6 +58,8 @@ for selected supercategory
 
 lr rate not loaded need to used load
 
+# scope things down to class generation instead of text generation?
+
 # questions:
 
 - regularization?
