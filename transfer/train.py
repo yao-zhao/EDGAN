@@ -1,19 +1,18 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
 from six.moves import xrange  # pylint: disable=redefined-builtin
 
 import common
-import model
 from dataloader import DataLoader
+import model
 
 from datetime import datetime
 import numpy as np
 import os
-import time
-
+from progressbar import ETA, Bar, Percentage, ProgressBar
 import tensorflow as tf
+import time
 
 FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_string('logdir', 'ckt_logs/classification/',
@@ -27,7 +26,7 @@ tf.app.flags.DEFINE_integer('max_epoch', 16,
                             """how many epochs to run""")
 tf.app.flags.DEFINE_integer('num_examples_train', 71832,
                             """number of examples in train""")
-tf.app.flags.DEFINE_string('gpu_id', '1',
+tf.app.flags.DEFINE_integer('gpu_id', 1,
                             """which gpu to use""")
 
 # loss 
@@ -65,7 +64,7 @@ def train_op(total_loss, global_step):
 def train_resnet():
     with tf.Graph().as_default():
 
-        FLAGS.batch_size=32
+        FLAGS.batch_size=8
         FLAGS.is_training=True
         FLAGS.minimal_summaries=False
         FLAGS.initial_learning_rate=1e-3
@@ -82,11 +81,10 @@ def train_resnet():
         images, labels, areas = dl.get_batch(FLAGS.batch_size)
         print('data queue loaded')
 
-        outputs = model.inference_resnet(images, dl.label_dim)
-
-        loss = compute_loss(outputs, labels)
-
-        op = train_op(loss, global_step)
+        with tf.device("/gpu:%d" % FLAGS.gpu_id):
+            outputs = model.inference_resnet(images, dl.label_dim)
+            loss = compute_loss(outputs, labels)
+            op = train_op(loss, global_step)
 
         saver = tf.train.Saver(tf.all_variables())
 
@@ -94,9 +92,10 @@ def train_resnet():
             tf.summary.image('images', images)
             for var in tf.trainable_variables():
                 tf.summary.histogram(var.op.name, var)
-        tf.summary.merge_all()
+        summary_op = tf.summary.merge_all()
 
-        sess = tf.Session()
+        config = tf.ConfigProto(allow_soft_placement=True)
+        sess = tf.Session(config=config)
         sess.run(tf.initialize_all_variables())
         print('network initialized')
 
@@ -111,30 +110,25 @@ def train_resnet():
 
         summary_writer = tf.summary.FileWriter(FLAGS.logdir, sess.graph)
 
-        max_iter = int(FLAGS.max_epoch*
-                       FLAGS.num_examples_train/FLAGS.batch_size)
-        print('total iteration:', str(max_iter))
-        for step in xrange(max_iter):
-              start_time = time.time()
-              _, loss_value = sess.run([op, loss])
-              # loss_value = sess.run(loss) # test inference time only
-              duration = time.time() - start_time
-              assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
-              if step % 10 == 0:
-                  examples_per_sec = FLAGS.batch_size / duration
-                  sec_per_batch = float(duration)
-                  format_str = ('%s: step %d, loss = %.2f'
-                                ' (%.1f examples/sec; %.3f sec/batch)')
-                  print (format_str % (datetime.now(), step, loss_value,
-                                       examples_per_sec, sec_per_batch))
-              if step % 200 == 0:
-                  summary_str = sess.run(summary_op)
-                  summary_writer.add_summary(summary_str, step)
-        
-              # Save the model checkpoint periodically.
-              if step % 1000 == 0 or (step + 1) == max_iter:
-                  checkpoint_path = os.path.join(FLAGS.logdir, 'model.ckpt')
-                  saver.save(sess, checkpoint_path, global_step=step)
+        updates_per_epoch = int(FLAGS.num_examples_train/FLAGS.batch_size)
+        for epoch in xrange(FLAGS.max_epoch):
+            widgets = ["epoch #%d|" % epoch,
+                       Percentage(), Bar(), ETA()]
+            pbar = ProgressBar(maxval=updates_per_epoch,
+                               widgets=widgets)
+            pbar.start()
+            for i in xrange(updates_per_epoch):
+                pbar.update(i)
+                _, loss_value = sess.run([op, loss])
+                # loss_value = sess.run(loss) # test inference time only
+                assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
+
+            summary_str = sess.run(summary_op)
+            summary_writer.add_summary(summary_str, epoch)
+
+            checkpoint_path = os.path.join(FLAGS.logdir, 'model.ckpt')
+            saver.save(sess, checkpoint_path, global_step=epoch)
+
         coord.request_stop()
         coord.join(threads)
 
