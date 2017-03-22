@@ -115,6 +115,8 @@ def train_resnet():
                 _, loss_value = sess.run([op, loss])
                 # loss_value = sess.run(loss) # test inference time only
                 assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
+                if i % 100:
+                    print('loss value: %1.4f' % (loss_value))
 
             summary_str = sess.run(summary_op)
             summary_writer.add_summary(summary_str, epoch)
