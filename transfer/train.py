@@ -22,11 +22,11 @@ tf.app.flags.DEFINE_string('resnet_param',
                             """resnet parameters to be transfered""")
 tf.app.flags.DEFINE_boolean('minimal_summaries', False,
                             """whether to log everything""")
-tf.app.flags.DEFINE_integer('max_epoch', 16,
+tf.app.flags.DEFINE_integer('max_epoch', 6,
                             """how many epochs to run""")
 tf.app.flags.DEFINE_integer('num_examples_train', 71832,
                             """number of examples in train""")
-tf.app.flags.DEFINE_integer('gpu_id', 1,
+tf.app.flags.DEFINE_integer('gpu_id', 0,
                             """which gpu to use""")
 
 # loss 
@@ -63,13 +63,6 @@ def train_op(total_loss, global_step):
 
 def train_resnet():
     with tf.Graph().as_default():
-
-        FLAGS.batch_size=8
-        FLAGS.is_training=True
-        FLAGS.minimal_summaries=False
-        FLAGS.initial_learning_rate=1e-3
-        FLAGS.stddev=5e-2
-        FLAGS.weight_decay=1e-6
 
         global_step = tf.Variable(0, trainable=False)
 
