@@ -7,7 +7,7 @@ models/*
 Data/
 !models/resnet
 *.caffemodel
-*.ckpt.data*
+# *.ckpt.data*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
