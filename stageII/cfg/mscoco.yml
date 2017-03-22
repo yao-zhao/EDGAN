@@ -1,31 +1,33 @@
 CONFIG_NAME: 'stageI'
 
-DATASET_NAME: 'birds'
+DATASET_NAME: 'mscoco'
 EMBEDDING_TYPE: 'cnn-rnn'
 GPU_ID: 0
 Z_DIM: 100
 
+DATASET:
+    NUM_EXAMPLES: -1
+    TFRECORDS: '76_fur_app_major'
+
 TRAIN:
-    FLAG: True
     GAN_TYPE: 'WGAN'
+    FLAG: True
+    PRETRAINED_MODEL: ''
+    BATCH_SIZE: 64
+    NUM_COPY: 4
+    MAX_EPOCH: 400
+    SNAPSHOT_INTERVAL: 2000
+    DISCRIMINATOR_LR: 0.0002
+    GENERATOR_LR: 0.0002
+    LR_DECAY_EPOCH: 100
+    NUM_EMBEDDING: 4
+    COEFF:
+      KL: 2.0
     WGAN:
         WEIGHT_CLIP:
             VALUE: 0.01
             METHOD: 'all'
-    PRETRAINED_MODEL: ''
-    BATCH_SIZE: 64
-    NUM_COPY: 4
-    MAX_EPOCH: 1000
-    SNAPSHOT_INTERVAL: 2000
-    DISCRIMINATOR_LR: 0.0002
-    GENERATOR_LR: 0.0002
-    LR_DECAY_EPOCH: 200
-    NUM_EMBEDDING: 4
-    COEFF:
-      KL: 2.0
-
 GAN:
     EMBEDDING_DIM: 128
     DF_DIM: 64
     GF_DIM: 128
-    NETWORK_TYPE: 'no_batchnorm'
