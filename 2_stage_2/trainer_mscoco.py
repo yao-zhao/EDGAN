@@ -28,11 +28,6 @@ class CondGANTrainer_mscoco(CondGANTrainer):
         self.discriminator_lr = tf.placeholder(
             tf.float32, [],
             name='discriminator_learning_rate'
-
-        self.images = tf.image.resize_bilinear(self.hr_images,
-                                               self.lr_image_shape[:2])
-        self.wrong_images = tf.image.resize_bilinear(self.hr_wrong_images,
-                                                     self.lr_image_shape[:2])
         )
 
     def sampler(self):
@@ -47,12 +42,41 @@ class CondGANTrainer_mscoco(CondGANTrainer):
                 self.model.hr_get_generator(self.fake_images, hr_c)
 
 
+    def train_one_step(self, generator_lr,
+                       discriminator_lr,
+                       counter, summary_writer, log_vars, sess):
+        # training d
+        feed_dict = {self.generator_lr: generator_lr,
+                     self.discriminator_lr: discriminator_lr
+                     }
+        if cfg.TRAIN.FINETUNE_LR:
+            raise NotImplementedError
+        else:
+            # train d1
+            feed_out_d = [self.hr_discriminator_trainer, self.hr_d_sum,
+                          log_vars, self.hist_sum]
+            ret_list = sess.run(feed_out_d, feed_dict)
+            summary_writer.add_summary(ret_list[1], counter)
+            log_vals = ret_list[2]
+            summary_writer.add_summary(ret_list[3], counter)
+            # train g1
+            feed_out_g = [self.hr_generator_trainer, self.hr_g_sum]
+            for _ in range(cfg.TRAIN.CRITIC_PER_GENERATION):
+                _, hr_g_sum = sess.run(feed_out_g, feed_dict)
+            summary_writer.add_summary(hr_g_sum, counter)
+
+        return log_vals
+
     def train(self):
         config = tf.ConfigProto(allow_soft_placement=True)
         with tf.Session(config=config) as sess:
-            with tf.variable_scope('input'):
-                self.images, self.wrong_images, self.embeddings =\
-                    self.dataset.get_batch(self.batch_size)
+            self.hr_images, self.hr_wrong_images, self.embeddings =\
+                self.dataset.get_batch(self.batch_size)
+
+            self.images = tf.image.resize_bilinear(self.hr_images,
+                                                   self.lr_image_shape[:2])
+            self.wrong_images = tf.image.resize_bilinear(self.hr_wrong_images,
+                                                         self.lr_image_shape[:2])
             with tf.device("/gpu:%d" % cfg.GPU_ID):
                 counter = self.build_model(sess)
             coord = tf.train.Coordinator()
@@ -61,26 +85,30 @@ class CondGANTrainer_mscoco(CondGANTrainer):
             saver = tf.train.Saver(tf.global_variables(),
                                    keep_checkpoint_every_n_hours=2)
 
-            tf.summary.merge_all()
             summary_writer = tf.summary.FileWriter(self.log_dir,
                                                     sess.graph)
-            img_sum = self.epoch_sum_images(sess, \
+            img_sum, img_sum2 = self.epoch_sum_images(sess, \
                 cfg.TRAIN.NUM_COPY, -1)
             summary_writer.add_summary(img_sum, -1)
+            summary_writer.add_summary(img_sum2, -1)
 
-            keys = ["d_loss", "g_loss"]
+            if cfg.TRAIN.FINETUNE_LR:
+                keys = ["hr_d_loss", "hr_g_loss", "d_loss", "g_loss"]
+            else:
+                keys = ["d_loss", "g_loss"]
             log_vars = []
             log_keys = []
             for k, v in self.log_vars:
                 if k in keys:
                     log_vars.append(v)
                     log_keys.append(k)
-                    # print(k, v)
+
             generator_lr = cfg.TRAIN.GENERATOR_LR
             discriminator_lr = cfg.TRAIN.DISCRIMINATOR_LR
             lr_decay_step = cfg.TRAIN.LR_DECAY_EPOCH
             number_example = self.dataset.num_examples
             updates_per_epoch = int(number_example / self.batch_size)
+            decay_start = cfg.TRAIN.PRETRAINED_EPOCH
             epoch_start = int(counter / updates_per_epoch)
             for epoch in range(epoch_start, self.max_epoch):
                 widgets = ["epoch #%d|" % epoch,
@@ -89,34 +117,19 @@ class CondGANTrainer_mscoco(CondGANTrainer):
                                    widgets=widgets)
                 pbar.start()
 
-                if epoch % lr_decay_step == 0 and epoch != 0:
+                if epoch % lr_decay_step == 0 and epoch > decay_start:
                     generator_lr *= 0.5
                     discriminator_lr *= 0.5
 
                 all_log_vals = []
                 for i in range(updates_per_epoch):
                     pbar.update(i)
-                    feed_out = [self.discriminator_trainer,
-                                self.d_sum,
-                                self.hist_sum,
-                                log_vars]
-                    for _ in range(cfg.TRAIN.CRITIC_PER_GENERATION):
-                        feed_dict = {self.generator_lr: generator_lr,
-                                     self.discriminator_lr: discriminator_lr
-                                     }
-                        # training d
-                        _,d_sum, hist_sum, log_vals = \
-                            sess.run(feed_out, feed_dict)
-                        sess.run(self.weight_clip_op)
-                    summary_writer.add_summary(d_sum, counter)
-                    summary_writer.add_summary(hist_sum, counter)
+                    log_vals = self.train_one_step(generator_lr,
+                               discriminator_lr,
+                               counter, summary_writer,
+                               log_vars, sess)
                     all_log_vals.append(log_vals)
-                    # train g
-                    feed_out = [self.generator_trainer,
-                                self.g_sum,
-                                ]
-                    _, g_sum  = sess.run(feed_out,feed_dict)
-                    summary_writer.add_summary(g_sum, counter)
+
                     # save checkpoint
                     counter += 1
                     if counter % self.snapshot_interval == 0:
@@ -127,8 +140,10 @@ class CondGANTrainer_mscoco(CondGANTrainer):
                         fn = saver.save(sess, snapshot_path)
                         print("Model saved in file: %s" % fn)
 
-                img_sum = self.epoch_sum_images(sess, cfg.TRAIN.NUM_COPY, epoch)
+                img_sum, img_sum2 = \
+                    self.epoch_sum_images(sess, cfg.TRAIN.NUM_COPY, epoch)
                 summary_writer.add_summary(img_sum, counter)
+                summary_writer.add_summary(img_sum2, counter)
 
                 all_d_hist_sum = sess.run(self.all_d_hist_sum)
                 summary_writer.add_summary(all_d_hist_sum, counter)
@@ -167,6 +182,7 @@ class CondGANTrainer_mscoco(CondGANTrainer):
     def visualization(self, n):
         with tf.variable_scope('duplicate_image'):
             images_train = self.duplicate_input(self.images, n)
+            hr_images_train = self.duplicate_input(self.hr_images, n)
         with tf.variable_scope('visualization'):
             fake_sum_train, superimage_train = \
                 self.visualize_one_superimage(self.fake_images[:n * n],
@@ -174,6 +190,12 @@ class CondGANTrainer_mscoco(CondGANTrainer):
                                               n, "train")
             self.superimages = superimage_train
             self.image_summary = tf.summary.merge([fake_sum_train])
+            hr_fake_sum_train, hr_superimage_train = \
+                self.visualize_one_superimage(self.hr_fake_images[:n * n],
+                                              hr_images_train[:n * n],
+                                              n, "train")
+            self.hr_superimages = hr_superimage_train
+            self.hr_image_summary = tf.summary.merge([hr_fake_sum_train])
 
     def duplicate_input(self, x, n):
         assert n*n < self.batch_size
@@ -186,10 +208,14 @@ class CondGANTrainer_mscoco(CondGANTrainer):
         return out
 
     def epoch_sum_images(self, sess, n, epoch):
-        gen_samples, img_summary =\
-            sess.run([self.superimages, self.image_summary])
+        gen_samples, img_summary, hr_gen_samples, hr_img_summary =\
+            sess.run([self.superimages, self.image_summary,\
+                self.hr_superimages, self.hr_image_summary])
 
-        scipy.misc.imsave(\
-            '%s/train_%d.jpg' % (self.log_dir, epoch), gen_samples[0])
+        scipy.misc.imsave('%s/lr_fake_train.jpg' %
+                          (self.log_dir), gen_samples[0])
 
-        return img_summary
+        scipy.misc.imsave('%s/hr_fake_train.jpg' %
+                          (self.log_dir), hr_gen_samples[0])
+
+        return img_summary, hr_img_summary
