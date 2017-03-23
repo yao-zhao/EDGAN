@@ -20,7 +20,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train a GAN network')
     parser.add_argument('--cfg', dest='cfg_file',
                         help='optional config file',
-                        default='stageI/cfg/mscoco.yml', type=str)
+                        default='2_stage_1/cfg/mscoco.yml', type=str)
     parser.add_argument('--gpu', dest='gpu_id',
                         help='GPU device id to use [0]',
                         default=-1, type=int)
@@ -56,7 +56,8 @@ if __name__ == "__main__":
         image_shape=dataset.image_shape
     )
 
-    copyfile(os.path.join('stageI', 'cfg', 'mscoco.yml'), os.path.join(ckt_logs_dir, 'mscoco.yml'))
+    copyfile(os.path.join('2_stage_1', 'cfg', 'mscoco.yml'),\
+        os.path.join(ckt_logs_dir, 'mscoco.yml'))
 
     algo = CondGANTrainer_mscoco(
         model=model,

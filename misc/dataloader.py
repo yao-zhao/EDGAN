@@ -28,6 +28,7 @@ class DataLoader():
         self.image_shape = imsize + [3]
         print('Dataset %s loaded with %d examples' % \
             (' '.join(tfrecord), self.num_examples))
+        self.hr_lr_ratio = 4
 
     def get_num_exmaples(self):
         print('start counting')
