@@ -112,9 +112,106 @@ class CondGAN(object):
              apply(tf.nn.tanh))
         return output_tensor
 
+    def generator_large(self, z_var):
+        node1_0 =\
+            (pt.wrap(z_var).
+             flatten().
+             custom_fully_connected(self.s16 * self.s16 * self.gf_dim * 8).
+             fc_batch_norm().
+             reshape([-1, self.s16, self.s16, self.gf_dim * 8]))
+        node1_1 = \
+            (node1_0.
+             custom_conv2d(self.gf_dim * 2, k_h=1, k_w=1, d_h=1, d_w=1).
+             conv_batch_norm().
+             apply(leaky_rectify, leakiness=0.2).
+             custom_conv2d(self.gf_dim * 2, k_h=3, k_w=3, d_h=1, d_w=1).
+             conv_batch_norm().
+             apply(leaky_rectify, leakiness=0.2).
+             custom_conv2d(self.gf_dim * 8, k_h=3, k_w=3, d_h=1, d_w=1).
+             conv_batch_norm())
+        node1 = \
+            (node1_0.
+             apply(tf.add, node1_1).
+             apply(leaky_rectify, leakiness=0.2)
+             )
+
+        node2_0 = \
+            (node1.
+             apply(tf.image.resize_nearest_neighbor, [self.s8, self.s8]).
+             custom_conv2d(self.gf_dim * 4, k_h=3, k_w=3, d_h=1, d_w=1).
+             conv_batch_norm())
+        node2_1 = \
+            (node2_0.
+             custom_conv2d(self.gf_dim * 1, k_h=1, k_w=1, d_h=1, d_w=1).
+             conv_batch_norm().
+             apply(leaky_rectify, leakiness=0.2).
+             custom_conv2d(self.gf_dim * 1, k_h=3, k_w=3, d_h=1, d_w=1).
+             conv_batch_norm().
+             apply(leaky_rectify, leakiness=0.2).
+             custom_conv2d(self.gf_dim * 4, k_h=3, k_w=3, d_h=1, d_w=1).
+             conv_batch_norm())
+        node2 = \
+            (node2_0.
+             apply(tf.add, node2_1).
+             apply(leaky_rectify, leakiness=0.2)
+             )
+
+        node3_0 = \
+            (node2.
+             apply(tf.image.resize_nearest_neighbor, [self.s4, self.s4]).
+             custom_conv2d(self.gf_dim * 2, k_h=3, k_w=3, d_h=1, d_w=1).
+             conv_batch_norm())
+        node3_1 = \
+            (node3_0.
+             custom_conv2d(self.gf_dim / 2, k_h=1, k_w=1, d_h=1, d_w=1).
+             conv_batch_norm().
+             apply(leaky_rectify, leakiness=0.2).
+             custom_conv2d(self.gf_dim / 2, k_h=3, k_w=3, d_h=1, d_w=1).
+             conv_batch_norm().
+             apply(leaky_rectify, leakiness=0.2).
+             custom_conv2d(self.gf_dim * 2, k_h=3, k_w=3, d_h=1, d_w=1).
+             conv_batch_norm())
+        node3 = \
+            (node3_0.
+             apply(tf.add, node3_1).
+             apply(leaky_rectify, leakiness=0.2)
+             )
+
+        node4_0 = \
+            (node3.
+             apply(tf.image.resize_nearest_neighbor, [self.s2, self.s2]).
+             custom_conv2d(self.gf_dim, k_h=3, k_w=3, d_h=1, d_w=1).
+             conv_batch_norm())
+        node4_1 = \
+            (node4_0.
+             custom_conv2d(self.gf_dim / 4, k_h=1, k_w=1, d_h=1, d_w=1).
+             conv_batch_norm().
+             apply(leaky_rectify, leakiness=0.2).
+             custom_conv2d(self.gf_dim / 4, k_h=3, k_w=3, d_h=1, d_w=1).
+             conv_batch_norm().
+             apply(leaky_rectify, leakiness=0.2).
+             custom_conv2d(self.gf_dim, k_h=3, k_w=3, d_h=1, d_w=1).
+             conv_batch_norm())
+        node4 = \
+            (node4_0.
+             apply(tf.add, node4_1).
+             apply(leaky_rectify, leakiness=0.2)
+             )
+
+        output_tensor = \
+            (node4.
+             apply(tf.image.resize_nearest_neighbor, [self.s, self.s]).
+             custom_conv2d(3, k_h=3, k_w=3, d_h=1, d_w=1).
+             apply(tf.nn.tanh))
+        return output_tensor
+
     def get_generator(self, z_var):
         if cfg.GAN.NETWORK_TYPE == "default":
             return self.generator(z_var)
+        elif cfg.GAN.NETWORK_TYPE == "large":
+            return self.generator_large(z_var)
+        elif cfg.GAN.NETWORK_TYPE == "no_batchnorm":
+            return self.generator_large(z_var)
         else:
             raise NotImplementedError
 
