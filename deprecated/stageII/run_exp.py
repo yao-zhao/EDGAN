@@ -6,12 +6,10 @@ import dateutil.tz
 import datetime
 import argparse
 import pprint
-from shutil import copyfile
-import os
 
-from dataloader import DataLoader
-from model import CondGAN
-from trainer import CondGANTrainer
+from misc.datasets import TextDataset
+from stageI.model import CondGAN
+from stageI.trainer import CondGANTrainer
 from misc.utils import mkdir_p
 from misc.config import cfg, cfg_from_file
 
@@ -20,10 +18,13 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train a GAN network')
     parser.add_argument('--cfg', dest='cfg_file',
                         help='optional config file',
-                        default='stageI/cfg/mscoco.yml', type=str)
+                        default='stageI/cfg/birds.yml', type=str)
     parser.add_argument('--gpu', dest='gpu_id',
                         help='GPU device id to use [0]',
                         default=-1, type=int)
+    # if len(sys.argv) == 1:
+    #    parser.print_help()
+    #    sys.exit(1)
     args = parser.parse_args()
     return args
 
@@ -39,12 +40,14 @@ if __name__ == "__main__":
     now = datetime.datetime.now(dateutil.tz.tzlocal())
     timestamp = now.strftime('%Y_%m_%d_%H_%M_%S')
 
-    tfrecord_path = 'Data/%s/%s.tfrecords' % \
-        (cfg.DATASET_NAME, cfg.DATASET.TFRECORDS)
-    crop_size = cfg.TRAIN.LR_IMSIZE
-    dataset = DataLoader(tfrecord_path, [crop_size, crop_size],
-        num_examples=cfg.DATASET.NUM_EXAMPLES)
+    datadir = 'Data/%s' % cfg.DATASET_NAME
+    dataset = TextDataset(datadir, cfg.EMBEDDING_TYPE, 1)
+    filename_test = '%s/test' % (datadir)
+    dataset.test = dataset.get_data(filename_test)
     if cfg.TRAIN.FLAG:
+        filename_train = '%s/train' % (datadir)
+        dataset.train = dataset.get_data(filename_train)
+
         ckt_logs_dir = "ckt_logs/%s/%s_%s" % \
             (cfg.DATASET_NAME, cfg.CONFIG_NAME, timestamp)
         mkdir_p(ckt_logs_dir)
@@ -56,9 +59,7 @@ if __name__ == "__main__":
         image_shape=dataset.image_shape
     )
 
-    copyfile(os.path.join('stageI', 'cfg', 'mscoco.yml'), os.path.join(ckt_logs_dir, 'mscoco.yml'))
-
-    algo = CondGANTrainer_mscoco(
+    algo = CondGANTrainer(
         model=model,
         dataset=dataset,
         ckt_logs_dir=ckt_logs_dir
@@ -66,4 +67,7 @@ if __name__ == "__main__":
     if cfg.TRAIN.FLAG:
         algo.train()
     else:
+        ''' For every input text embedding/sentence in the
+        training and test datasets, generate cfg.TRAIN.NUM_COPY
+        images with randomness from noise z and conditioning augmentation.'''
         algo.evaluate()

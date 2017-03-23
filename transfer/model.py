@@ -6,7 +6,7 @@ import tensorflow as tf
 
 FLAGS = tf.app.flags.FLAGS
 # basics
-tf.app.flags.DEFINE_integer('batch_size', 32,
+tf.app.flags.DEFINE_integer('batch_size', 24,
                             """Number of images to process in a batch.""")
 # naming
 tf.app.flags.DEFINE_string('UPDATE_OPS_COLLECTION', 'update_ops',
@@ -14,7 +14,7 @@ tf.app.flags.DEFINE_string('UPDATE_OPS_COLLECTION', 'update_ops',
 tf.app.flags.DEFINE_string('LOSSES_COLLECTION', 'losses',
                           """ collection of ops to be updated""")
 # training
-tf.app.flags.DEFINE_integer('num_epochs_per_decay', 4,
+tf.app.flags.DEFINE_integer('num_epochs_per_decay', 2,
                           """number of epochs per decay""")
 tf.app.flags.DEFINE_float('initial_learning_rate', 0.01,
                           """initial learning rate""")
