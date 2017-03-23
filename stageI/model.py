@@ -8,12 +8,12 @@ import misc.custom_ops
 from misc.custom_ops import leaky_rectify
 from misc.config import cfg
 
-
-class CondGAN(object):
-    def __init__(self, image_shape):
+class CondGAN_StageI(object):
+    def __init__(self, embedding_shape=[8, 8, 80]):
         self.batch_size = cfg.TRAIN.BATCH_SIZE
         self.network_type = cfg.GAN.NETWORK_TYPE
-        self.image_shape = image_shape
+        self.image_shape = embedding_shape[:2]
+        self.num_classes = embedding_shape[2]
         self.gf_dim = cfg.GAN.GF_DIM
         self.df_dim = cfg.GAN.DF_DIM
         self.ef_dim = cfg.GAN.EMBEDDING_DIM
