@@ -28,18 +28,23 @@ class CondGANTrainer_mscoco(CondGANTrainer):
         self.discriminator_lr = tf.placeholder(
             tf.float32, [],
             name='discriminator_learning_rate'
+
+        self.images = tf.image.resize_bilinear(self.hr_images,
+                                               self.lr_image_shape[:2])
+        self.wrong_images = tf.image.resize_bilinear(self.hr_wrong_images,
+                                                     self.lr_image_shape[:2])
         )
 
-
     def sampler(self):
-        with tf.variable_scope('duplicate_embedding'):
-            embed = self.duplicate_input(self.embeddings, cfg.TRAIN.NUM_COPY)
-        c, _ = self.sample_encoded_context(embed)
-        # if cfg.TRAIN.FLAG:
-        #     z = tf.zeros([self.batch_size, cfg.Z_DIM])  # Expect similar BGs
-        # else:
-        z = tf.random_normal([self.batch_size, cfg.Z_DIM])
-        self.fake_images = self.model.get_generator(tf.concat([c, z], 1))
+        embed = self.duplicate_input(self.embeddings, cfg.TRAIN.NUM_COPY)
+        with tf.variable_scope("g_net", reuse=True):
+            c, _ = self.sample_encoded_context(embed)
+            z = tf.random_normal([self.batch_size, cfg.Z_DIM])
+            self.fake_images = self.model.get_generator(tf.concat([c, z], 1))
+        with tf.variable_scope("hr_g_net", reuse=True):
+            hr_c, _ = self.sample_encoded_context(embed)
+            self.hr_fake_images =\
+                self.model.hr_get_generator(self.fake_images, hr_c)
 
 
     def train(self):
