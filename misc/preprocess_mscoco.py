@@ -7,7 +7,7 @@ from __future__ import unicode_literals
 import cv2
 import numpy as np
 import os
-from misc.cocoAPI.pycocotools.coco import COCO
+from pycocotools.coco import COCO
 import torchfile
 import tensorflow as tf
 
