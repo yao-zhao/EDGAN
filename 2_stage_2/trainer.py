@@ -46,6 +46,7 @@ class CondGANTrainer(object):
         self.max_epoch = cfg.TRAIN.MAX_EPOCH
         self.snapshot_interval = cfg.TRAIN.SNAPSHOT_INTERVAL
         self.model_path = cfg.TRAIN.PRETRAINED_MODEL
+        self.weight_clip_op = []
 
         self.log_vars = []
 
@@ -285,8 +286,10 @@ class CondGANTrainer(object):
                 all_vars = tf.trainable_variables()
                 if cfg.TRAIN.WGAN.WEIGHT_CLIP.METHOD == 'all':
                     wc_vars = [var for var in all_vars \
-                        if var.name.startswith('d_') \
-                        or var.name.startswith('hr_d_')]
+                        if (var.name.startswith('d_') \
+                        or var.name.startswith('hr_d_')) \
+                        and not 'batch_norm' in var.name # double check this
+                        ]
                 elif cfg.TRAIN.WGAN.WEIGHT_CLIP.METHOD == 'last':
                     wc_vars = [var for var in all_vars \
                         if 'output_f' in var.name]
