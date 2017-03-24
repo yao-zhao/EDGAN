@@ -54,6 +54,9 @@ visual genome data set
 - Transfer learning from trained classifcation to form intermediate map
 - check regularization
 - check scale of embedding and embedding discriminator weight clipping
+- check batchnorm weight clipping, exclude that
+- output captions for mscoco
+
 ## major
 - train classification
 - generate classification map
