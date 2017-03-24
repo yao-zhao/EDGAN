@@ -7,6 +7,8 @@ from __future__ import unicode_literals
 import cv2
 import numpy as np
 import os
+import sys
+sys.path.append('misc/coco/PythonAPI/')
 from pycocotools.coco import COCO
 import torchfile
 import tensorflow as tf
