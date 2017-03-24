@@ -213,10 +213,10 @@ class CondGANTrainer_mscoco(CondGANTrainer):
             sess.run([self.superimages, self.image_summary,\
                 self.hr_superimages, self.hr_image_summary])
 
-        scipy.misc.imsave('%s/lr_fake_train.jpg' %
-                          (self.log_dir), gen_samples[0])
+        scipy.misc.imsave('%s/lr_fake_train_%d.jpg' %
+                          (self.log_dir, epoch), gen_samples[0])
 
-        scipy.misc.imsave('%s/hr_fake_train.jpg' %
-                          (self.log_dir), hr_gen_samples[0])
+        scipy.misc.imsave('%s/hr_fake_train_%d.jpg' %
+                          (self.log_dir, epoch), hr_gen_samples[0])
 
         return img_summary, hr_img_summary

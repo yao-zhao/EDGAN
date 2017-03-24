@@ -376,7 +376,7 @@ class CondGANTrainer(object):
                 x[i * n + j] = x[i * n]
         return x
 
-    def epoch_sum_images(self, sess, n):
+    def epoch_sum_images(self, sess, n, epoch):
         images_train, _, embeddings_train, captions_train, _ =\
             self.dataset.train.next_batch(n * n, cfg.TRAIN.NUM_EMBEDDING)
         images_train = self.preprocess(images_train, n)
@@ -405,15 +405,15 @@ class CondGANTrainer(object):
             sess.run(feed_out, feed_dict)
 
         # save images generated for train and test captions
-        scipy.misc.imsave('%s/lr_fake_train.jpg' %
-                          (self.log_dir), gen_samples[0])
-        scipy.misc.imsave('%s/lr_fake_test.jpg' %
-                          (self.log_dir), gen_samples[1])
+        scipy.misc.imsave('%s/lr_fake_train_%d.jpg' %
+                          (self.log_dir, epoch), gen_samples[0])
+        scipy.misc.imsave('%s/lr_fake_test_%d.jpg' %
+                          (self.log_dir, epoch), gen_samples[1])
         #
-        scipy.misc.imsave('%s/hr_fake_train.jpg' %
-                          (self.log_dir), hr_gen_samples[0])
-        scipy.misc.imsave('%s/hr_fake_test.jpg' %
-                          (self.log_dir), hr_gen_samples[1])
+        scipy.misc.imsave('%s/hr_fake_train_%d.jpg' %
+                          (self.log_dir, epoch), hr_gen_samples[0])
+        scipy.misc.imsave('%s/hr_fake_test_%d.jpg' %
+                          (self.log_dir, epoch), hr_gen_samples[1])
 
         # pfi_train = open(self.log_dir + "/train.txt", "w")
         pfi_test = open(self.log_dir + "/test.txt", "w")
@@ -580,7 +580,7 @@ class CondGANTrainer(object):
                             print("Model saved in file: %s" % fn)
 
                     img_summary, img_summary2 =\
-                        self.epoch_sum_images(sess, cfg.TRAIN.NUM_COPY)
+                        self.epoch_sum_images(sess, cfg.TRAIN.NUM_COPY, epoch)
                     # summary_writer.add_summary(img_summary, counter)
                     # summary_writer.add_summary(img_summary2, counter)
 
