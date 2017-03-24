@@ -37,9 +37,9 @@ class CondGAN(object):
 
         elif cfg.GAN.NETWORK_TYPE == "no_batchnorm":
             with tf.variable_scope("d_net"):
-                self.d_encode_img_template = self.d_encode_image_nobatchnorm()
                 self.d_context_template = self.context_embedding()
-                self.discriminator_template = self.discriminator_nobatchnorm()
+                self.d_image_template = self.d_encode_image()
+                self.d_discriminator_template = self.discriminator()
 
             with tf.variable_scope("hr_d_net"):
                 self.hr_d_context_template = self.context_embedding()
@@ -345,15 +345,17 @@ class CondGAN(object):
     # d-net
     def d_encode_image(self):
         node1_0 = \
-            (pt.template("input").  # s * s * 3
-             custom_conv2d(self.df_dim, k_h=4, k_w=4).  # s2 * s2 * df_dim
-             apply(leaky_rectify, leakiness=0.2).
-             custom_conv2d(self.df_dim * 2, k_h=4, k_w=4).  # s4 * s4 * df_dim*2
+            (pt.template("input").
+             custom_conv2d(self.df_dim, k_h=4, k_w=4).
              conv_batch_norm().
              apply(leaky_rectify, leakiness=0.2).
-             custom_conv2d(self.df_dim * 4, k_h=4, k_w=4).  # s8 * s8 * df_dim*4
+             custom_conv2d(self.df_dim * 2, k_h=4, k_w=4).
              conv_batch_norm().
-             custom_conv2d(self.df_dim * 8, k_h=4, k_w=4).  # s16 * s16 * df_dim*8
+             apply(leaky_rectify, leakiness=0.2).
+             custom_conv2d(self.df_dim * 4, k_h=4, k_w=4).
+             conv_batch_norm().
+             apply(leaky_rectify, leakiness=0.2).
+             custom_conv2d(self.df_dim * 8, k_h=4, k_w=4).
              conv_batch_norm())
         node1_1 = \
             (node1_0.

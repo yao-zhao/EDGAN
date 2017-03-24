@@ -1,4 +1,4 @@
-CONFIG_NAME: 'stageI'
+CONFIG_NAME: 'stageII'
 
 DATASET_NAME: 'mscoco'
 EMBEDDING_TYPE: 'cnn-rnn'
@@ -7,12 +7,12 @@ Z_DIM: 100
 
 DATASET:
     NUM_EXAMPLES: -1
-    TFRECORDS: '76_fur_app_major'
+    TFRECORDS: '304_fur_app_major'
 
 TRAIN:
     GAN_TYPE: 'WGAN'
     FLAG: True
-    PRETRAINED_MODEL: ''
+    PRETRAINED_MODEL: 'ckt_logs/mscoco/stageI_2017_03_21_22_33_40/model_48000.ckpt'
     BATCH_SIZE: 64
     NUM_COPY: 4
     MAX_EPOCH: 400
@@ -31,3 +31,4 @@ GAN:
     EMBEDDING_DIM: 128
     DF_DIM: 64
     GF_DIM: 128
+    NETWORK_TYPE: 'no_batchnorm' #'default', 'simple', 'large'

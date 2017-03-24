@@ -16,7 +16,7 @@ from misc.utils import mkdir_p
 
 TINY = 1e-8
 
-from stageI.trainer import CondGANTrainer
+from trainer import CondGANTrainer
 
 class CondGANTrainer_mscoco(CondGANTrainer):
 
@@ -55,14 +55,15 @@ class CondGANTrainer_mscoco(CondGANTrainer):
             # train d1
             feed_out_d = [self.hr_discriminator_trainer, self.hr_d_sum,
                           log_vars, self.hist_sum]
-            ret_list = sess.run(feed_out_d, feed_dict)
+            for _ in range(cfg.TRAIN.CRITIC_PER_GENERATION):
+                ret_list = sess.run(feed_out_d, feed_dict)
+            sess.run(self.weight_clip_op)
             summary_writer.add_summary(ret_list[1], counter)
             log_vals = ret_list[2]
             summary_writer.add_summary(ret_list[3], counter)
             # train g1
             feed_out_g = [self.hr_generator_trainer, self.hr_g_sum]
-            for _ in range(cfg.TRAIN.CRITIC_PER_GENERATION):
-                _, hr_g_sum = sess.run(feed_out_g, feed_dict)
+            _, hr_g_sum = sess.run(feed_out_g, feed_dict)
             summary_writer.add_summary(hr_g_sum, counter)
 
         return log_vals

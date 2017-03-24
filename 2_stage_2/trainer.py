@@ -282,6 +282,7 @@ class CondGANTrainer(object):
         if cfg.TRAIN.GAN_TYPE == 'WGAN':
             with tf.variable_scope('weight_clips'):
                 weight_clip_op = []
+                all_vars = tf.trainable_variables()
                 if cfg.TRAIN.WGAN.WEIGHT_CLIP.METHOD == 'all':
                     wc_vars = [var for var in all_vars \
                         if var.name.startswith('d_') \
@@ -506,6 +507,7 @@ class CondGANTrainer(object):
                           ]
             ret_list = sess.run(feed_out_d, feed_dict)
             # summary_writer.add_summary(ret_list[1], counter)
+            sess.run(self.weight_clip_op)
             log_vals = ret_list[2]
             # summary_writer.add_summary(ret_list[3], counter)
             # train g1

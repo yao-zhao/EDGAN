@@ -75,6 +75,10 @@ visual genome data set
 - [LSGAN]
 - [BGAN]
 
+<!-- 
+things to correct:
+2_stage_1 wgan config not specify nobatchnorm, it use default large instead -->
+
 
 <!-- 
 # retest things!

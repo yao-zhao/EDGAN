@@ -10,8 +10,8 @@ from shutil import copyfile
 import os
 
 from misc.dataloader import DataLoader
-from stageI.model import CondGAN
-from stageI.trainer_mscoco import CondGANTrainer_mscoco
+from model import CondGAN
+from trainer_mscoco import CondGANTrainer_mscoco
 from misc.utils import mkdir_p
 from misc.config import cfg, cfg_from_file
 
@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
     tfrecord_path = 'Data/%s/%s.tfrecords' % \
         (cfg.DATASET_NAME, cfg.DATASET.TFRECORDS)
-    crop_size = cfg.TRAIN.LR_IMSIZE
+    crop_size = cfg.TRAIN.HR_IMSIZE
     dataset = DataLoader(tfrecord_path, [crop_size, crop_size],
         num_examples=cfg.DATASET.NUM_EXAMPLES)
     if cfg.TRAIN.FLAG:
