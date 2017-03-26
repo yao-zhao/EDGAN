@@ -16,7 +16,7 @@ from misc.utils import mkdir_p
 
 TINY = 1e-8
 
-from stageI.trainer import CondGANTrainer
+from trainer import CondGANTrainer
 
 class CondGANTrainer_mscoco(CondGANTrainer):
 

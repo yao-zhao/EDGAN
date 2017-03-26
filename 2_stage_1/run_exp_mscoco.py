@@ -10,8 +10,8 @@ from shutil import copyfile
 import os
 
 from misc.dataloader import DataLoader
-from stageI.model import CondGAN
-from stageI.trainer_mscoco import CondGANTrainer_mscoco
+from model import CondGAN
+from trainer_mscoco import CondGANTrainer_mscoco
 from misc.utils import mkdir_p
 from misc.config import cfg, cfg_from_file
 

@@ -10,16 +10,16 @@ DATASET:
     TFRECORDS: '76_fur_app_major'
 
 TRAIN:
-    GAN_TYPE: 'WGAN'
+    GAN_TYPE: 'LSGAN'
     FLAG: True
     PRETRAINED_MODEL: ''
     BATCH_SIZE: 64
     NUM_COPY: 4
-    MAX_EPOCH: 400
+    MAX_EPOCH: 600
     SNAPSHOT_INTERVAL: 2000
     DISCRIMINATOR_LR: 0.0002
     GENERATOR_LR: 0.0002
-    LR_DECAY_EPOCH: 100
+    LR_DECAY_EPOCH: 150
     NUM_EMBEDDING: 4
     COEFF:
       KL: 2.0
@@ -31,3 +31,4 @@ GAN:
     EMBEDDING_DIM: 128
     DF_DIM: 64
     GF_DIM: 128
+    NETWORK_TYPE: 'large' #no_batchnorm' #'default', 'simple', 'large'
