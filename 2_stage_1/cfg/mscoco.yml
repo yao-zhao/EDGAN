@@ -10,7 +10,7 @@ DATASET:
     TFRECORDS: '76_fur_app_major'
 
 TRAIN:
-    GAN_TYPE: 'LSGAN'
+    GAN_TYPE: 'WGAN'
     FLAG: True
     PRETRAINED_MODEL: ''
     BATCH_SIZE: 64

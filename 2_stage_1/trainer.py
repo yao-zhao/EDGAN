@@ -198,13 +198,16 @@ class CondGANTrainer(object):
                 weight_clip_op = []
                 if cfg.TRAIN.WGAN.WEIGHT_CLIP.METHOD == 'all':
                     wc_vars = [var for var in all_vars \
-                        if var.name.startswith('d_')]
+                        if var.name.startswith('d_') \
+                        and 'batch_norm' not in var.name]
                 elif cfg.TRAIN.WGAN.WEIGHT_CLIP.METHOD == 'last':
                     wc_vars = [var for var in all_vars \
                         if 'output_f' in var.name]
                 else:
                     raise NotImplementedError
+                print('weight clipping following:')
                 for wc_var in wc_vars:
+                    print(wc_var.name)
                     weight_clip_op.append(tf.assign(wc_var,
                         tf.clip_by_value(wc_var,
                         -cfg.TRAIN.WGAN.WEIGHT_CLIP.VALUE,
