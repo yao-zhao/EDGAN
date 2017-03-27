@@ -49,7 +49,6 @@ visual genome data set
 
 # ToDo List
 ## minor
-- better negative sampling
 - Multi Stack tests
 - Transfer learning from trained classifcation to form intermediate map
 - check regularization
@@ -60,10 +59,12 @@ visual genome data set
 ## major
 - debug wgan
 - debug second stage gan
+- better negative sampling
+
 - train classification (takes long, should do it in caffe)
 - generate classification map (try use ground truth)
 - new piplines for 3 stage gan inputs 
-- write up 3 stage gan
+- finish 3 stage gan
 - train 3 stage gan
 
 # Test results

@@ -93,10 +93,7 @@ class CondGANTrainer_mscoco(CondGANTrainer):
             summary_writer.add_summary(img_sum, -1)
             summary_writer.add_summary(img_sum2, -1)
 
-            if cfg.TRAIN.FINETUNE_LR:
-                keys = ["hr_d_loss", "hr_g_loss", "d_loss", "g_loss"]
-            else:
-                keys = ["d_loss", "g_loss"]
+            keys = ["hr_d_loss", "hr_g_loss", "d_loss", "g_loss"]
             log_vars = []
             log_keys = []
             for k, v in self.log_vars:
