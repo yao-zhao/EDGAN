@@ -21,8 +21,8 @@ KEEP_RATIO = True
 ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
 CV_FLAG = cv2.INTER_CUBIC
 # CV_FLAG = cv2.INTER_LINEAR
-#DEBUG = False
-DEBUG = True
+DEBUG = False
+# DEBUG = True
 FILTER_ASPECT_RATIO = True
 ASPECT_RATIO = 9/16
 AREA_TH = 0.01
@@ -217,10 +217,9 @@ def test_tfrecords(tfrecords_filename):
         t_file = torchfile.load(os.path.join(COCO_DIR, 'train2014_ex_t7',
             os.path.splitext(filename_string)[0]+'.t7'))
         embd = t_file.txt
-        
-        #captions = np.fromstring(captions, dtype=np.char)
+
         print(captions)
-        
+
         if not np.allclose(img, reconstructed_img) or\
             not np.allclose(embd, recon_embd):
             print("image does not match")
@@ -240,7 +239,7 @@ if __name__ == '__main__':
         filenames = get_ImageIds(coco, selected_supers)
         save_tfrecords(train_dir, embed_dir, COCO_DIR, filenames, tag='_fur_app')
 
-    if False:
+    if True:
         selected_supers = \
             ['furniture', 'appliance']
         filenames = get_ImageIds_Major(coco, selected_supers, exceptions=['people'])

@@ -58,9 +58,11 @@ visual genome data set
 - output captions for mscoco
 
 ## major
-- train classification
-- generate classification map
-- new piplines for 3 stage gan inputs
+- debug wgan
+- debug second stage gan
+- train classification (takes long, should do it in caffe)
+- generate classification map (try use ground truth)
+- new piplines for 3 stage gan inputs 
 - write up 3 stage gan
 - train 3 stage gan
 

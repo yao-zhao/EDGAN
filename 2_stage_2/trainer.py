@@ -446,7 +446,7 @@ class CondGANTrainer(object):
                     # print(var.name)
             saver = tf.train.Saver(restore_vars)
             saver.restore(sess, self.model_path)
-
+            print("model restored")
             istart = self.model_path.rfind('_') + 1
             iend = self.model_path.rfind('.')
             counter = self.model_path[istart:iend]
@@ -528,10 +528,9 @@ class CondGANTrainer(object):
         with tf.Session(config=config) as sess:
             with tf.device("/gpu:%d" % cfg.GPU_ID):
                 counter = self.build_model(sess)
+                print(counter)
                 saver = tf.train.Saver(tf.all_variables(),
                                        keep_checkpoint_every_n_hours=5)
-
-                # summary_op = tf.merge_all_summaries()
                 summary_writer = tf.summary.FileWriter(self.log_dir,
                                                         sess.graph)
 
@@ -553,6 +552,7 @@ class CondGANTrainer(object):
                 # int((counter + lr_decay_step/2) / lr_decay_step)
                 decay_start = cfg.TRAIN.PRETRAINED_EPOCH
                 epoch_start = int(counter / updates_per_epoch)
+                print('epoch_start: %d' % (epoch_start))
                 for epoch in range(epoch_start, self.max_epoch):
                     widgets = ["epoch #%d|" % epoch,
                                Percentage(), Bar(), ETA()]
