@@ -150,23 +150,23 @@ class CondGANTrainer(object):
             else:
                 real_d_loss =\
                     tf.nn.sigmoid_cross_entropy_with_logits(
-                                                            labels = tf.ones_like(real_logit),
-                                                            logits = real_logit,)
+                        labels = tf.ones_like(real_logit),
+                        logits = real_logit,)
                 real_d_loss = tf.reduce_mean(real_d_loss)
                 wrong_d_loss =\
                     tf.nn.sigmoid_cross_entropy_with_logits(
-                                                            labels = tf.zeros_like(wrong_logit),
-                                                            logits = wrong_logit)
+                        labels = tf.zeros_like(wrong_logit),
+                        logits = wrong_logit)
                 wrong_d_loss = tf.reduce_mean(wrong_d_loss)
                 fake_d_loss =\
                     tf.nn.sigmoid_cross_entropy_with_logits(
-                                                            labels = tf.zeros_like(fake_logit),
-                                                            logits = fake_logit)
+                        labels = tf.zeros_like(fake_logit),
+                        logits = fake_logit)
                 fake_d_loss = tf.reduce_mean(fake_d_loss)
                 generator_loss = \
                     tf.nn.sigmoid_cross_entropy_with_logits(
-                                                            labels = tf.ones_like(fake_logit),
-                                                            logits = fake_logit)
+                        labels = tf.ones_like(fake_logit),
+                        logits = fake_logit)
                 generator_loss = tf.reduce_mean(generator_loss)
 
             if cfg.TRAIN.B_WRONG:
@@ -198,13 +198,16 @@ class CondGANTrainer(object):
                 weight_clip_op = []
                 if cfg.TRAIN.WGAN.WEIGHT_CLIP.METHOD == 'all':
                     wc_vars = [var for var in all_vars \
-                        if var.name.startswith('d_')]
+                        if var.name.startswith('d_') \
+                        and 'batch_norm' not in var.name]
                 elif cfg.TRAIN.WGAN.WEIGHT_CLIP.METHOD == 'last':
                     wc_vars = [var for var in all_vars \
                         if 'output_f' in var.name]
                 else:
                     raise NotImplementedError
+                print('weight clipping following:')
                 for wc_var in wc_vars:
+                    print(wc_var.name)
                     weight_clip_op.append(tf.assign(wc_var,
                         tf.clip_by_value(wc_var,
                         -cfg.TRAIN.WGAN.WEIGHT_CLIP.VALUE,

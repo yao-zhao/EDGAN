@@ -6,6 +6,8 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
+ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
+
 class DataLoader():
     def __init__(self, tfrecord, imsize, sample_embeddings_num=4,
         num_examples=None):
@@ -29,6 +31,7 @@ class DataLoader():
         print('Dataset %s loaded with %d examples' % \
             (' '.join(tfrecord), self.num_examples))
         self.hr_lr_ratio = 4
+        self.len_char  =201
 
     def get_num_exmaples(self):
         print('start counting')
@@ -52,7 +55,7 @@ class DataLoader():
             tf.stack([self.imsize[0], self.imsize[1], 3]))
         image = tf.image.random_flip_left_right(image)
         image = tf.to_float(image)
-        image = 2*image/256 - 1
+        image = image/128 - 1
         return image
 
     def get_batch(self, batch_size):
@@ -63,41 +66,61 @@ class DataLoader():
             'height': tf.FixedLenFeature([], tf.int64),
             'width': tf.FixedLenFeature([], tf.int64),
             'image': tf.FixedLenFeature([], tf.string),
-            'embedding': tf.FixedLenFeature([], tf.string)
+            'embedding': tf.FixedLenFeature([], tf.string),
+            'caption' : tf.FixedLenFeature([], tf.string),
             })
 
         image = tf.decode_raw(features['image'], tf.uint8)
         embedding = tf.decode_raw(features['embedding'], tf.float32)
+        caption = tf.decode_raw(features['caption'], tf.int8)
 
         height = tf.cast(features['height'], tf.int32)
         width = tf.cast(features['width'], tf.int32)
 
         img_shape = tf.stack([height, width, 3])
         embedding_shape = tf.stack([self.embedding_num, self.embedding_dim])
+        caption_shape = tf.stack([self.len_char, self.embedding_num])
 
         image = tf.reshape(image, img_shape)
         embedding = tf.reshape(embedding, embedding_shape)
+        caption = tf.reshape(caption, caption_shape)
 
         image = self.image_augmentation(image)
         embedding = self.sample_embeddings(embedding,
             self.sample_embeddings_num)
 
-        images, embeddings = tf.train.shuffle_batch(
-            [image, embedding], batch_size=batch_size*2,
+        images, embeddings, captions= tf.train.shuffle_batch(
+            [image, embedding, caption], batch_size=batch_size*2,
             capacity=self.capacity,
             num_threads=self.num_threads,
             min_after_dequeue=self.min_after_dequeue)
 
         real_images = images[:batch_size,:,:,:]
         wrong_images = images[batch_size:,:,:,:]
-        embeddings = embeddings[:batch_size,:]
-        return real_images, wrong_images, embeddings
+        real_embeddings = embeddings[:batch_size,:]
+        wrong_embeddings = embeddings[batch_size:,:]
+        real_captions = captions[:batch_size,:,:]
+        wrong_captions = captions[batch_size:,:,:]
+        return real_images, wrong_images, real_embeddings, wrong_embeddings,\
+            real_captions, wrong_captions
+
+    def caption2str(self, caption_array):
+        captions = []
+        for j in range(self.embedding_num):
+            chars = []
+            for i in caption_array[:,j].tolist():
+                if i > 0:
+                    chars.append(ALPHABET[i-1])
+            captions.append(''.join(chars))
+        return captions
+
 
 def test():
-    dl = DataLoader('Data/mscoco/76.tfrecords', [64, 64], num_examples=82783)
-    # dl.capacity = 1000
-    # dl.min_after_dequeue = 500
-    images, wrong_images, embeddings = dl.get_batch(6)
+    dl = DataLoader('Data/mscoco/76_fur_app_major.tfrecords', [64, 64], num_examples=82783)
+    dl.capacity = 1000
+    dl.min_after_dequeue = 500
+    images, wrong_images, embeddings, wrong_embeddings,\
+        captions, wrong_captions = dl.get_batch(6)
     init_op = tf.group(tf.global_variables_initializer(),
         tf.local_variables_initializer())
 
@@ -105,19 +128,28 @@ def test():
         sess.run(init_op)
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(coord=coord)
-        for i in xrange(3):
-            img, anno, = sess.run([images, embeddings])
+        for i in xrange(1):
+            img, anno, cap, wrong_cap = \
+                sess.run([images, embeddings, captions, wrong_captions])
             # numr, numw = sess.run([
             #     dl.reader.num_records_produced(),
             #     dl.reader.num_work_units_completed()])
             # print(numr)
             # print(numw)
+            print('batch %d' % (i))
             plt.imshow(img[0, :, :, :])
+            print('image shape:')
             print(img.shape)
+            print('embedding shape:')
             print(embeddings.shape)
+            print('caption:')
+            print(dl.caption2str(cap[0,:,:]))
+            print('wrong caption:')
+            print(dl.caption2str(wrong_cap[0,:,:]))
             plt.plot()
         coord.request_stop()
         coord.join(threads)
+
 
 
 if __name__ == '__main__':

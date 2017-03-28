@@ -19,19 +19,23 @@ LOAD_SIZE = int(IMSIZE * 76 / 64)
 COCO_DIR = 'Data/mscoco'
 KEEP_RATIO = True
 ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
-CV_FLAG = cv2.INTER_CUBIC
+CV_FLAG = cv2.INTER_AREA
+# CV_FLAG = cv2.INTER_CUBIC
 # CV_FLAG = cv2.INTER_LINEAR
 DEBUG = False
 # DEBUG = True
 FILTER_ASPECT_RATIO = True
 ASPECT_RATIO = 9/16
 AREA_TH = 0.01
-            
+LEN_CHAR = 201
+NUM_CHAR = 5
+NUM_EMBED = 5
+
 def get_ImageIds(coco, selected_supers):
     cats = coco.loadCats(coco.getCatIds())
     selected_subs = []
     for cat in cats:
-        if cat['supercategory'] in selected_supers:
+        if cat['supercategory'] in selected_supers or not selected_supers:
             selected_subs.append(str(cat['name']))
     print('chosen sub classes: '+' '.join(selected_subs))
     imgIds = []
@@ -124,12 +128,7 @@ def save_tfrecords(imagepath, embeddingpath, outpath,
             t_file = torchfile.load(os.path.join(embeddingpath,
                 os.path.splitext(filename)[0]+'.t7'))
             embedding_str = t_file.txt.tostring()
-
-            captions = ''
-            for j in range(5):
-                captions = captions + int2alph(t_file.char[:,j].tolist()) + '\n'
-            captions = ''.join(captions)
-            num_char = len(captions)
+            caption_str = t_file.char.tostring()
 
             lr_example = tf.train.Example(features=tf.train.Features(feature={
                 'height': _int64_feature(lr_img.shape[0]),
@@ -137,8 +136,7 @@ def save_tfrecords(imagepath, embeddingpath, outpath,
                 'image': _bytes_feature(lr_img.tostring()),
                 'filename': _bytes_feature(str(filename)),
                 'embedding': _bytes_feature(embedding_str),
-                'caption': _bytes_feature(str(captions)),
-                'num_char': _int64_feature(num_char)
+                'caption': _bytes_feature(caption_str),
                  }))
             lr_writer.write(lr_example.SerializeToString())
 
@@ -148,13 +146,15 @@ def save_tfrecords(imagepath, embeddingpath, outpath,
                 'image': _bytes_feature(hr_img.tostring()),
                 'filename': _bytes_feature(str(filename)),
                 'embedding': _bytes_feature(embedding_str),
-                'caption': _bytes_feature(str(captions)),
-                'num_char': _int64_feature(num_char)
+                'caption': _bytes_feature(caption_str),
                  }))
             hr_writer.write(hr_example.SerializeToString())
 
-
             if i == 0:
+                captions = ''
+                for j in range(5):
+                    captions = captions + int2alph(t_file.char[:,j].tolist()) + '\n'
+                captions = ''.join(captions)
                 print("captions: ")
                 print(captions)
                 print("embedding shape:")
@@ -199,12 +199,9 @@ def test_tfrecords(tfrecords_filename):
         embd_string = (example.features.feature['embedding']
                                       .bytes_list
                                       .value[0])
-        captions = (example.features.feature['caption']
+        chars = (example.features.feature['caption']
                                     .bytes_list
                                     .value[0])
-        num_char = (example.features.feature['num_char']
-                                  .int64_list
-                                  .value[0])
         img_1d = np.fromstring(img_string, dtype=np.uint8)
         reconstructed_img = img_1d.reshape((height, width, -1))
         img = cv2.imread(os.path.join(\
@@ -218,28 +215,57 @@ def test_tfrecords(tfrecords_filename):
             os.path.splitext(filename_string)[0]+'.t7'))
         embd = t_file.txt
 
+        chars = np.fromstring(chars, dtype=np.int8)
+        chars = chars.reshape((LEN_CHAR, NUM_CHAR))
+        print(chars.shape)
+        captions = ''
+        for j in range(5):
+            captions = captions + int2alph(chars[:,j].tolist()) + '\n'
+        captions = ''.join(captions)
         print(captions)
+
+        inner_product = test_embeddings(recon_embd, recon_embd)
+        print('embedding inner products:')
+        print(inner_product)
+        if count > 0:
+            print('previous embedding inner products:')
+            inner_product2 = test_embeddings(recon_embd, previous_embedding)
+            print(inner_product2)
+        previous_embedding = recon_embd
 
         if not np.allclose(img, reconstructed_img) or\
             not np.allclose(embd, recon_embd):
             print("image does not match")
         count += 1
-        if count > 10:
+        if count > 20:
             break
     print("tfrecord check test passed for "+tfrecords_filename)
+
+def test_embeddings(embeddings1, embeddings2):
+    inner_product = np.zeros((NUM_EMBED, NUM_EMBED))
+    for i in range(NUM_EMBED):
+        for j in range(NUM_EMBED):
+            inner_product[i, j] = np.dot(embeddings1[i, :], embeddings2[j, :])
+    return inner_product
 
 if __name__ == '__main__':
     train_dir = os.path.join(COCO_DIR, 'train2014/')
     embed_dir = os.path.join(COCO_DIR, 'train2014_ex_t7')
     annoFile=os.path.join(COCO_DIR, 'annotations', 'instances_train2014.json')
     coco=COCO(annoFile)
+    if True:
+        selected_supers = \
+            []
+        filenames = get_ImageIds(coco, selected_supers)
+        save_tfrecords(train_dir, embed_dir, COCO_DIR, filenames, tag='')
+
     if False:
         selected_supers = \
             ['furniture', 'appliance']
         filenames = get_ImageIds(coco, selected_supers)
         save_tfrecords(train_dir, embed_dir, COCO_DIR, filenames, tag='_fur_app')
 
-    if True:
+    if False:
         selected_supers = \
             ['furniture', 'appliance']
         filenames = get_ImageIds_Major(coco, selected_supers, exceptions=['people'])

@@ -16,7 +16,7 @@ for selected supercategory
 
 # New features
 
-## Sentense embedding with visual information
+<!-- ## Sentense embedding with visual information -->
 
 ## Modification of GAN network
 - enlarge capacity of generator network, adding 3 residual blocks.
@@ -25,8 +25,9 @@ for selected supercategory
 
 ## Multiple training methods of GAN
 - Option to trian with vanilla GAN
-- Option to train with WGAN
+- Option to train with WGAN (excluding weight clipping for batchnorm)
 - Option to train with LSGAN
+- Option to train with CLSGAN, continous least square GAN that estimates the inner products of embeddings between right caption embeddings and wrong caption embeddings.
 - Option to train with BGAN (not implemented yet)
 
 ## Classification Transfering from Imagenet to MSCOCO
@@ -37,9 +38,9 @@ for selected supercategory
 ## Data input pipline
 - use mscoco python API
 - dataloader that load tfrecords from mscoco
-- image augumentation including cropping, flipping, and standarlization
-- sampling from multiple caption embeddings
-- negative example (not fully implemented yet)
+- image augumentation including cropping, flipping, and standarlization (when downsample the image, use INTER_AREA method)
+- sampling from multiple caption embeddings, visualize embedding distributions
+- negative example (use inner product of embedding captions, see method CLSGAN)
 - filter out selective images based on classes and their areas
 
 <!-- potential other data set, not as good
@@ -49,16 +50,17 @@ visual genome data set
 
 # ToDo List
 ## minor
-- Multi Stack tests
-- Transfer learning from trained classifcation to form intermediate map
 - check regularization
-- check scale of embedding and embedding discriminator weight clipping
-- check batchnorm weight clipping, exclude that
 - output captions for mscoco
+- in WGAN, disable embedding weight clipping
 
 ## major
-- debug wgan
 - debug second stage gan
+- better negative sampling
+
+# To Do List Future
+
+- further test wgan
 - better negative sampling
 
 - train classification (takes long, should do it in caffe)
@@ -70,7 +72,6 @@ visual genome data set
 # Test results
 - WGAN, takes longer to train, unclear about improvements (worse on bird, better on mscoco)
 - LSGAN, wrose result, shorter to train
-- LSGAN, later gennet.
 - lr need to be low, 0.0002 instead of 0.002
 
 # References publications
