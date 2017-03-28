@@ -41,12 +41,110 @@ class CondGANTrainer_mscoco(CondGANTrainer):
         z = tf.random_normal([self.batch_size, cfg.Z_DIM])
         self.fake_images = self.model.get_generator(tf.concat([c, z], 1))
 
+    def compute_embeddings_distances(self, embeddings1, embeddings2):
+        return tf.reduce_sum(tf.multiply(embeddings1, embeddings2)) / \
+            cfg.DATASET.EMBEDDING_NORM_FACTOR
+
+
+    def compute_losses(self, images, wrong_images, fake_images, \
+        embeddings, wrong_embeddings):
+        real_logit = self.model.get_discriminator(images, embeddings)
+        wrong_logit = self.model.get_discriminator(wrong_images, embeddings)
+        fake_logit = self.model.get_discriminator(fake_images, embeddings)
+
+        with tf.variable_scope("losses"):
+            if cfg.TRAIN.GAN_TYPE == 'LSGAN':
+                real_d_loss = tf.reduce_mean(tf.square(real_logit - 1))
+                wrong_d_loss = tf.reduce_mean(tf.square(wrong_logit))
+                fake_d_loss = tf.reduce_mean(tf.square(fake_logit))
+                generator_loss = 2*tf.reduce_mean(tf.square(fake_logit - 1))
+            elif cfg.TRAIN.GAN_TYPE == 'CLSGAN':
+                real_d_loss = tf.reduce_mean(tf.square(real_logit - \
+                    self.compute_embeddings_distances(embeddings, embeddings)))
+                wrong_d_loss = tf.reduce_mean(tf.square(wrong_logit) - \
+                    self.compute_embeddings_distances(embeddings, wrong_embeddings))
+                fake_d_loss = tf.reduce_mean(tf.square(fake_logit))
+                generator_loss = 2*tf.reduce_mean(tf.square(fake_logit - 1))
+            elif cfg.TRAIN.GAN_TYPE == 'WGAN':
+                real_d_loss = tf.reduce_mean(real_logit)
+                wrong_d_loss = -tf.reduce_mean(wrong_logit)
+                fake_d_loss = -tf.reduce_mean(fake_logit)
+                generator_loss = tf.reduce_mean(fake_logit)
+            else:
+                real_d_loss =\
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels = tf.ones_like(real_logit),
+                        logits = real_logit,)
+                real_d_loss = tf.reduce_mean(real_d_loss)
+                wrong_d_loss =\
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels = tf.zeros_like(wrong_logit),
+                        logits = wrong_logit)
+                wrong_d_loss = tf.reduce_mean(wrong_d_loss)
+                fake_d_loss =\
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels = tf.zeros_like(fake_logit),
+                        logits = fake_logit)
+                fake_d_loss = tf.reduce_mean(fake_d_loss)
+                generator_loss = \
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels = tf.ones_like(fake_logit),
+                        logits = fake_logit)
+                generator_loss = tf.reduce_mean(generator_loss)
+
+            if cfg.TRAIN.B_WRONG:
+                discriminator_loss =\
+                    real_d_loss + (wrong_d_loss + fake_d_loss) / 2.
+                self.log_vars.append(("d_loss_wrong", wrong_d_loss))
+            else:
+                discriminator_loss = real_d_loss + fake_d_loss
+            self.log_vars.append(("d_loss_real", real_d_loss))
+            self.log_vars.append(("d_loss_fake", fake_d_loss))
+
+        return discriminator_loss, generator_loss
+
+    def init_opt(self):
+        self.build_placeholder()
+
+        with pt.defaults_scope(phase=pt.Phase.train):
+            with tf.variable_scope("g_net"):
+                # ####get output from G network################################
+                c, kl_loss = self.sample_encoded_context(self.embeddings)
+                z = tf.random_normal([self.batch_size, cfg.Z_DIM])
+                self.log_vars.append(("hist_c", c))
+                self.log_vars.append(("hist_z", z))
+                fake_images = self.model.get_generator(tf.concat([c, z], 1))
+
+            # ####get discriminator_loss and generator_loss ###################
+            discriminator_loss, generator_loss =\
+                self.compute_losses(self.images,
+                                    self.wrong_images,
+                                    fake_images,
+                                    self.embeddings,
+                                    self.wrong_embeddings)
+            generator_loss += kl_loss
+            self.log_vars.append(("g_loss_kl_loss", kl_loss))
+            self.log_vars.append(("g_loss", generator_loss))
+            self.log_vars.append(("d_loss", discriminator_loss))
+
+            # #######Total loss for build optimizers###########################
+            self.prepare_trainer(generator_loss, discriminator_loss)
+            # #######define self.g_sum, self.d_sum,....########################
+            self.define_summaries()
+
+        with pt.defaults_scope(phase=pt.Phase.test):
+            with tf.variable_scope("g_net", reuse=True):
+                self.sampler()
+            self.visualization(cfg.TRAIN.NUM_COPY)
+            print("success")
 
     def train(self):
         config = tf.ConfigProto(allow_soft_placement=True)
         with tf.Session(config=config) as sess:
             with tf.variable_scope('input'):
-                self.images, self.wrong_images, self.embeddings =\
+                self.images, self.wrong_images, \
+                self.embeddings, self.wrong_embeddings, \
+                self.captions, self.wrong_captions = \
                     self.dataset.get_batch(self.batch_size)
             with tf.device("/gpu:%d" % cfg.GPU_ID):
                 counter = self.build_model(sess)

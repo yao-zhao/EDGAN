@@ -27,6 +27,7 @@ for selected supercategory
 - Option to trian with vanilla GAN
 - Option to train with WGAN (excluding weight clipping for batchnorm)
 - Option to train with LSGAN
+- Option to train with CLSGAN, continous least square GAN that estimates the inner products of embeddings between right caption embeddings and wrong caption embeddings.
 - Option to train with BGAN (not implemented yet)
 
 ## Classification Transfering from Imagenet to MSCOCO
@@ -38,8 +39,8 @@ for selected supercategory
 - use mscoco python API
 - dataloader that load tfrecords from mscoco
 - image augumentation including cropping, flipping, and standarlization
-- sampling from multiple caption embeddings
-- negative example (not fully implemented yet)
+- sampling from multiple caption embeddings, visualize embedding distributions
+- negative example (use inner product of embedding captions, see method CLSGAN)
 - filter out selective images based on classes and their areas
 
 <!-- potential other data set, not as good
@@ -50,9 +51,8 @@ visual genome data set
 # ToDo List
 ## minor
 - check regularization
-- visualize inner product of embeddings
 - output captions for mscoco
-
+- in WGAN, disable embedding weight clipping
 
 ## major
 - debug second stage gan

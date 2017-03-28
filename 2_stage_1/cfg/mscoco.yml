@@ -7,10 +7,11 @@ Z_DIM: 100
 
 DATASET:
     NUM_EXAMPLES: -1
-    TFRECORDS: '76_fur_app_major'
+    # TFRECORDS: '76_fur_app_major'
+    TFRECORDS: '76'
 
 TRAIN:
-    GAN_TYPE: 'WGAN'
+    GAN_TYPE: 'CLSGAN'
     FLAG: True
     PRETRAINED_MODEL: ''
     BATCH_SIZE: 64
