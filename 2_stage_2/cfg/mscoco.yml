@@ -12,9 +12,10 @@ DATASET:
 TRAIN:
     GAN_TYPE: 'LSGAN'
     FLAG: True
-    PRETRAINED_MODEL: 'ckt_logs/mscoco/stageI_2017_03_21_22_33_40/model_48000.ckpt'
+    #PRETRAINED_MODEL: 'ckt_logs/mscoco/stageI_2017_03_21_22_33_40/model_48000.ckpt'
+    PRETRAINED_MODEL: 'ckt_logs/mscoco/stageI_2017_03_24_16_25_30/model_74000.ckpt'
     PRETRAINED_EPOCH: 400
-    BATCH_SIZE: 32
+    BATCH_SIZE: 64
     NUM_COPY: 4
     MAX_EPOCH: 800
     SNAPSHOT_INTERVAL: 2000
@@ -32,4 +33,4 @@ GAN:
     EMBEDDING_DIM: 128
     DF_DIM: 64
     GF_DIM: 128
-    NETWORK_TYPE: 'no_batchnorm' #'default', 'simple', 'large'
+    NETWORK_TYPE: 'large' #'no_batchnorm' #'default', 'simple', 'large'

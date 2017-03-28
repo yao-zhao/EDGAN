@@ -24,7 +24,7 @@ class CondGAN(object):
         print('lr_imsize: ', lr_imsize)
         self.s2, self.s4, self.s8, self.s16 = \
             int(self.s / 2), int(self.s / 4), int(self.s / 8), int(self.s / 16)
-        if cfg.GAN.NETWORK_TYPE == "default":
+        if cfg.GAN.NETWORK_TYPE == "default" or "large":
             with tf.variable_scope("d_net"):
                 self.d_context_template = self.context_embedding()
                 self.d_image_template = self.d_encode_image()
@@ -219,7 +219,7 @@ class CondGAN(object):
     def get_generator(self, z_var):
         if cfg.GAN.NETWORK_TYPE == "default":
             return self.generator(z_var)
-        elif cfg.GAN.NETWORK_TYPE == "no_batchnorm":
+        elif cfg.GAN.NETWORK_TYPE == "no_batchnorm" or "large":
             return self.generator_large(z_var)
         else:
             raise NotImplementedError
@@ -289,7 +289,7 @@ class CondGAN(object):
         return output_tensor
 
     def hr_get_generator(self, x_var, c_code):
-        if cfg.GAN.NETWORK_TYPE == "default" or "no_batchnorm":
+        if cfg.GAN.NETWORK_TYPE == "default" or "no_batchnorm" or "large":
             # image x_var: self.s * self.s *3
             x_code = self.hr_g_encode_image(x_var)  # -->s4 * s4 * gf_dim * 4
 
