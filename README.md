@@ -25,7 +25,7 @@ for selected supercategory
 
 ## Multiple training methods of GAN
 - Option to trian with vanilla GAN
-- Option to train with WGAN
+- Option to train with WGAN (excluding weight clipping for batchnorm)
 - Option to train with LSGAN
 - Option to train with BGAN (not implemented yet)
 
@@ -49,16 +49,18 @@ visual genome data set
 
 # ToDo List
 ## minor
-- Multi Stack tests
-- Transfer learning from trained classifcation to form intermediate map
 - check regularization
-- check scale of embedding and embedding discriminator weight clipping
-- check batchnorm weight clipping, exclude that
+- visualize inner product of embeddings
 - output captions for mscoco
 
+
 ## major
-- debug wgan
 - debug second stage gan
+- better negative sampling
+
+# To Do List Future
+
+- further test wgan
 - better negative sampling
 
 - train classification (takes long, should do it in caffe)
@@ -70,7 +72,6 @@ visual genome data set
 # Test results
 - WGAN, takes longer to train, unclear about improvements (worse on bird, better on mscoco)
 - LSGAN, wrose result, shorter to train
-- LSGAN, later gennet.
 - lr need to be low, 0.0002 instead of 0.002
 
 # References publications
