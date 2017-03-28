@@ -26,7 +26,9 @@ DEBUG = False
 FILTER_ASPECT_RATIO = True
 ASPECT_RATIO = 9/16
 AREA_TH = 0.01
-            
+LEN_CHAR = 201
+NUM_CHAR = 5
+
 def get_ImageIds(coco, selected_supers):
     cats = coco.loadCats(coco.getCatIds())
     selected_subs = []
@@ -124,12 +126,7 @@ def save_tfrecords(imagepath, embeddingpath, outpath,
             t_file = torchfile.load(os.path.join(embeddingpath,
                 os.path.splitext(filename)[0]+'.t7'))
             embedding_str = t_file.txt.tostring()
-
-            captions = ''
-            for j in range(5):
-                captions = captions + int2alph(t_file.char[:,j].tolist()) + '\n'
-            captions = ''.join(captions)
-            num_char = len(captions)
+            caption_str = t_file.char.tostring()
 
             lr_example = tf.train.Example(features=tf.train.Features(feature={
                 'height': _int64_feature(lr_img.shape[0]),
@@ -137,8 +134,7 @@ def save_tfrecords(imagepath, embeddingpath, outpath,
                 'image': _bytes_feature(lr_img.tostring()),
                 'filename': _bytes_feature(str(filename)),
                 'embedding': _bytes_feature(embedding_str),
-                'caption': _bytes_feature(str(captions)),
-                'num_char': _int64_feature(num_char)
+                'caption': _bytes_feature(caption_str),
                  }))
             lr_writer.write(lr_example.SerializeToString())
 
@@ -148,13 +144,15 @@ def save_tfrecords(imagepath, embeddingpath, outpath,
                 'image': _bytes_feature(hr_img.tostring()),
                 'filename': _bytes_feature(str(filename)),
                 'embedding': _bytes_feature(embedding_str),
-                'caption': _bytes_feature(str(captions)),
-                'num_char': _int64_feature(num_char)
+                'caption': _bytes_feature(caption_str),
                  }))
             hr_writer.write(hr_example.SerializeToString())
 
-
             if i == 0:
+                captions = ''
+                for j in range(5):
+                    captions = captions + int2alph(t_file.char[:,j].tolist()) + '\n'
+                captions = ''.join(captions)
                 print("captions: ")
                 print(captions)
                 print("embedding shape:")
@@ -199,12 +197,9 @@ def test_tfrecords(tfrecords_filename):
         embd_string = (example.features.feature['embedding']
                                       .bytes_list
                                       .value[0])
-        captions = (example.features.feature['caption']
+        chars = (example.features.feature['caption']
                                     .bytes_list
                                     .value[0])
-        num_char = (example.features.feature['num_char']
-                                  .int64_list
-                                  .value[0])
         img_1d = np.fromstring(img_string, dtype=np.uint8)
         reconstructed_img = img_1d.reshape((height, width, -1))
         img = cv2.imread(os.path.join(\
@@ -218,6 +213,13 @@ def test_tfrecords(tfrecords_filename):
             os.path.splitext(filename_string)[0]+'.t7'))
         embd = t_file.txt
 
+        chars = np.fromstring(chars, dtype=np.int8)
+        chars = chars.reshape((LEN_CHAR, NUM_CHAR))
+        print(chars.shape)
+        captions = ''
+        for j in range(5):
+            captions = captions + int2alph(chars[:,j].tolist()) + '\n'
+        captions = ''.join(captions)
         print(captions)
 
         if not np.allclose(img, reconstructed_img) or\
@@ -232,14 +234,14 @@ if __name__ == '__main__':
     train_dir = os.path.join(COCO_DIR, 'train2014/')
     embed_dir = os.path.join(COCO_DIR, 'train2014_ex_t7')
     annoFile=os.path.join(COCO_DIR, 'annotations', 'instances_train2014.json')
-    coco=COCO(annoFile)
+    # coco=COCO(annoFile)
     if False:
         selected_supers = \
             ['furniture', 'appliance']
         filenames = get_ImageIds(coco, selected_supers)
         save_tfrecords(train_dir, embed_dir, COCO_DIR, filenames, tag='_fur_app')
 
-    if True:
+    if False:
         selected_supers = \
             ['furniture', 'appliance']
         filenames = get_ImageIds_Major(coco, selected_supers, exceptions=['people'])
