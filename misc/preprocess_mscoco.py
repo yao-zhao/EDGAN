@@ -253,7 +253,7 @@ if __name__ == '__main__':
     embed_dir = os.path.join(COCO_DIR, 'train2014_ex_t7')
     annoFile=os.path.join(COCO_DIR, 'annotations', 'instances_train2014.json')
     coco=COCO(annoFile)
-    if True:
+    if False:
         selected_supers = \
             []
         filenames = get_ImageIds(coco, selected_supers)
@@ -265,7 +265,7 @@ if __name__ == '__main__':
         filenames = get_ImageIds(coco, selected_supers)
         save_tfrecords(train_dir, embed_dir, COCO_DIR, filenames, tag='_fur_app')
 
-    if False:
+    if True:
         selected_supers = \
             ['furniture', 'appliance']
         filenames = get_ImageIds_Major(coco, selected_supers, exceptions=['people'])
