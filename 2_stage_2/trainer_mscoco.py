@@ -107,7 +107,7 @@ class CondGANTrainer_mscoco(CondGANTrainer):
             number_example = self.dataset.num_examples
             updates_per_epoch = int(number_example / self.batch_size)
             decay_start = cfg.TRAIN.PRETRAINED_EPOCH
-            epoch_start = int(counter / updates_per_epoch) * 2 # hot fix for batch size diff
+            epoch_start = int(counter / updates_per_epoch) # hot fix for batch size diff
             print('epoch start at %d' % (epoch_start))
             for epoch in range(epoch_start, self.max_epoch):
                 widgets = ["epoch #%d|" % epoch,
