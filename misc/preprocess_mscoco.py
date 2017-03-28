@@ -19,7 +19,8 @@ LOAD_SIZE = int(IMSIZE * 76 / 64)
 COCO_DIR = 'Data/mscoco'
 KEEP_RATIO = True
 ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
-CV_FLAG = cv2.INTER_CUBIC
+CV_FLAG = cv2.INTER_AREA
+# CV_FLAG = cv2.INTER_CUBIC
 # CV_FLAG = cv2.INTER_LINEAR
 DEBUG = False
 # DEBUG = True
