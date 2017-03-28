@@ -3,13 +3,12 @@ from __future__ import print_function
 
 import prettytensor as pt
 import tensorflow as tf
+import matplotlib.pyplot as plt
 import numpy as np
-import scipy.misc
 import os
 import sys
 from six.moves import range
 from progressbar import ETA, Bar, Percentage, ProgressBar
-
 
 from misc.config import cfg
 from misc.utils import mkdir_p
@@ -279,10 +278,52 @@ class CondGANTrainer_mscoco(CondGANTrainer):
         return out
 
     def epoch_sum_images(self, sess, n, epoch):
-        gen_samples, img_summary =\
-            sess.run([self.superimages, self.image_summary])
+        gen_samples, img_summary, captions =\
+            sess.run([self.superimages, self.image_summary, self.captions])
+        print(gen_samples.shape)
 
-        scipy.misc.imsave(\
-            '%s/train_%d.jpg' % (self.log_dir, epoch), gen_samples[0])
+        selected_captions = []
+        for i in range(n):
+            selected_captions.append(caption2str(captions[i*n])[0])
+
+        # scipy.misc.imsave(\
+        #     '%s/train_%d.jpg' % (self.log_dir, epoch), gen_samples[0])
+
+        self.save_image_caption(gen_samples[0], selected_captions, n,\
+            '%s/train_%d.jpg' % (self.log_dir, epoch))
 
         return img_summary
+
+    def save_image_caption(self, image, captions, n, filename,
+        hmargin = 15, vmargin1 = 3, vmargin2 = 2):
+        image = ((image + 1) * 128).astype(np.uint8)
+        imsize = self.model.image_shape
+        new_image = np.zeros(((imsize[0]+hmargin)*n,
+            (imsize[1]+vmargin2)*(n+1)+vmargin1, 3), np.uint8)
+        for i in range(n):
+            new_image[(imsize[0]+hmargin)*i+hmargin:(imsize[0]+hmargin)*(i+1),\
+                0:imsize[1],:] = \
+                image[imsize[0]*i:imsize[0]*(i+1),0:imsize[1],:]
+            for j in range(n):
+                new_image[(imsize[0]+hmargin)*i+hmargin:(imsize[0]+hmargin)*(i+1),\
+                    (imsize[1]+vmargin2)*(j+1)+vmargin1:(imsize[1]+vmargin2)*(j+1)+vmargin1+imsize[1],:] = \
+                    image[imsize[0]*i:imsize[0]*(i+1),imsize[1]*(j+1):imsize[1]*(j+2),:]
+        fig = plt.figure()
+        plt.imshow(new_image)
+        for i in range(n):
+            plt.text(5, (imsize[0]+hmargin)*i+hmargin-5, captions[i],
+                color='w', fontsize = 10)
+        plt.axis('off')
+        fig.savefig(filename)
+
+
+def caption2str(caption_array):
+    ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
+    captions = []
+    for j in range(5):
+        chars = []
+        for i in caption_array[:,j].tolist():
+            if i > 0:
+                chars.append(ALPHABET[i-1])
+        captions.append(''.join(chars))
+    return captions

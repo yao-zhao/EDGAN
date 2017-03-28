@@ -8,6 +8,7 @@ Z_DIM: 100
 DATASET:
     NUM_EXAMPLES: -1
     # TFRECORDS: '76_fur_app_major'
+    NUM_EXAMPLES: 80028
     TFRECORDS: '76'
 
 TRAIN:

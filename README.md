@@ -16,7 +16,7 @@ for selected supercategory
 
 # New features
 
-## Sentense embedding with visual information
+<!-- ## Sentense embedding with visual information -->
 
 ## Modification of GAN network
 - enlarge capacity of generator network, adding 3 residual blocks.
@@ -38,7 +38,7 @@ for selected supercategory
 ## Data input pipline
 - use mscoco python API
 - dataloader that load tfrecords from mscoco
-- image augumentation including cropping, flipping, and standarlization
+- image augumentation including cropping, flipping, and standarlization (when downsample the image, use INTER_AREA method)
 - sampling from multiple caption embeddings, visualize embedding distributions
 - negative example (use inner product of embedding captions, see method CLSGAN)
 - filter out selective images based on classes and their areas
