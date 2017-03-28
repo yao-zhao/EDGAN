@@ -28,12 +28,13 @@ ASPECT_RATIO = 9/16
 AREA_TH = 0.01
 LEN_CHAR = 201
 NUM_CHAR = 5
+NUM_EMBED = 5
 
 def get_ImageIds(coco, selected_supers):
     cats = coco.loadCats(coco.getCatIds())
     selected_subs = []
     for cat in cats:
-        if cat['supercategory'] in selected_supers:
+        if cat['supercategory'] in selected_supers or not selected_supers:
             selected_subs.append(str(cat['name']))
     print('chosen sub classes: '+' '.join(selected_subs))
     imgIds = []
@@ -222,19 +223,41 @@ def test_tfrecords(tfrecords_filename):
         captions = ''.join(captions)
         print(captions)
 
+        inner_product = test_embeddings(recon_embd, recon_embd)
+        print('embedding inner products:')
+        print(inner_product)
+        if count > 0:
+            print('previous embedding inner products:')
+            inner_product2 = test_embeddings(recon_embd, previous_embedding)
+            print(inner_product2)
+        previous_embedding = recon_embd
+
         if not np.allclose(img, reconstructed_img) or\
             not np.allclose(embd, recon_embd):
             print("image does not match")
         count += 1
-        if count > 10:
+        if count > 20:
             break
     print("tfrecord check test passed for "+tfrecords_filename)
+
+def test_embeddings(embeddings1, embeddings2):
+    inner_product = np.zeros((NUM_EMBED, NUM_EMBED))
+    for i in range(NUM_EMBED):
+        for j in range(NUM_EMBED):
+            inner_product[i, j] = np.dot(embeddings1[i, :], embeddings2[j, :])
+    return inner_product
 
 if __name__ == '__main__':
     train_dir = os.path.join(COCO_DIR, 'train2014/')
     embed_dir = os.path.join(COCO_DIR, 'train2014_ex_t7')
     annoFile=os.path.join(COCO_DIR, 'annotations', 'instances_train2014.json')
-    # coco=COCO(annoFile)
+    coco=COCO(annoFile)
+    if True:
+        selected_supers = \
+            []
+        filenames = get_ImageIds(coco, selected_supers)
+        save_tfrecords(train_dir, embed_dir, COCO_DIR, filenames, tag='')
+
     if False:
         selected_supers = \
             ['furniture', 'appliance']
