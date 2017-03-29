@@ -51,12 +51,11 @@ visual genome data set
 # ToDo List
 ## minor
 - check regularization
-- output captions for mscoco
 - in WGAN, disable embedding weight clipping
 
 ## major
 - debug second stage gan
-- better negative sampling
+- test CLSGAN
 
 # To Do List Future
 

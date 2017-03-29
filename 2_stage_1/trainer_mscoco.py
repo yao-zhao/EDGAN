@@ -315,6 +315,7 @@ class CondGANTrainer_mscoco(CondGANTrainer):
                 color='w', fontsize = 10)
         plt.axis('off')
         fig.savefig(filename)
+        plt.close(fig)
 
 
 def caption2str(caption_array):
