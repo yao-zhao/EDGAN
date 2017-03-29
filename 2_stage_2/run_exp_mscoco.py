@@ -57,8 +57,7 @@ if __name__ == "__main__":
         hr_lr_ratio=dataset.hr_lr_ratio
     )
 
-    copyfile(os.path.join('2_stage_2', 'cfg', 'mscoco.yml'),\
-        os.path.join(ckt_logs_dir, 'mscoco.yml'))
+    pprint.pprint(cfg, open(os.path.join(ckt_logs_dir, 'cfg.txt'), 'w'))
 
     algo = CondGANTrainer_mscoco(
         model=model,

@@ -41,6 +41,144 @@ class CondGANTrainer_mscoco(CondGANTrainer):
             self.hr_fake_images =\
                 self.model.hr_get_generator(self.fake_images, hr_c)
 
+    def compute_embeddings_distances(self, embeddings1, embeddings2):
+        return tf.reduce_sum(tf.multiply(embeddings1, embeddings2), axis = 1) / \
+            cfg.DATASET.EMBEDDING_NORM_FACTOR
+
+    def compute_losses(self, images, wrong_images,
+                       fake_images, embeddings, flag='lr'):
+        if flag == 'lr':
+            real_logit =\
+                self.model.get_discriminator(images, embeddings)
+            wrong_logit =\
+                self.model.get_discriminator(wrong_images, embeddings)
+            fake_logit =\
+                self.model.get_discriminator(fake_images, embeddings)
+        elif flag == 'hr':
+            real_logit =\
+                self.model.hr_get_discriminator(images, embeddings)
+            wrong_logit =\
+                self.model.hr_get_discriminator(wrong_images, embeddings)
+            fake_logit =\
+                self.model.hr_get_discriminator(fake_images, embeddings)
+        else:
+            raise NotImplementedError
+
+        with tf.variable_scope("losses"):
+            if cfg.TRAIN.GAN_TYPE == 'LSGAN':
+                real_d_loss = tf.reduce_mean(tf.square(real_logit - 1))
+                wrong_d_loss = tf.reduce_mean(tf.square(wrong_logit))
+                fake_d_loss = tf.reduce_mean(tf.square(fake_logit))
+                generator_loss = 2*tf.reduce_mean(tf.square(fake_logit - 1))
+            elif cfg.TRAIN.GAN_TYPE == 'CLSGAN':
+                real_d_loss = tf.reduce_mean(tf.square(real_logit - \
+                    self.compute_embeddings_distances(embeddings, embeddings)))
+                wrong_d_loss = tf.reduce_mean(tf.square(wrong_logit) - \
+                    self.compute_embeddings_distances(embeddings, wrong_embeddings))
+                fake_d_loss = tf.reduce_mean(tf.square(fake_logit))
+                generator_loss = 2*tf.reduce_mean(tf.square(fake_logit - 1))
+            elif cfg.TRAIN.GAN_TYPE == 'WGAN':
+                real_d_loss = tf.reduce_mean(real_logit)
+                wrong_d_loss = -tf.reduce_mean(wrong_logit)
+                fake_d_loss = -tf.reduce_mean(fake_logit)
+                generator_loss = tf.reduce_mean(fake_logit)
+            else:
+                real_d_loss =\
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels = tf.ones_like(real_logit),
+                        logits = real_logit,)
+                real_d_loss = tf.reduce_mean(real_d_loss)
+                wrong_d_loss =\
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels = tf.zeros_like(wrong_logit),
+                        logits = wrong_logit)
+                wrong_d_loss = tf.reduce_mean(wrong_d_loss)
+                fake_d_loss =\
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels = tf.zeros_like(fake_logit),
+                        logits = fake_logit)
+                fake_d_loss = tf.reduce_mean(fake_d_loss)
+                generator_loss = \
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels = tf.ones_like(fake_logit),
+                        logits = fake_logit)
+                generator_loss = tf.reduce_mean(generator_loss)
+
+        if cfg.TRAIN.B_WRONG:
+            discriminator_loss =\
+                real_d_loss + (wrong_d_loss + fake_d_loss) / 2.
+        else:
+            discriminator_loss = real_d_loss + fake_d_loss
+        if flag == 'lr':
+            self.log_vars.append(("d_loss_real", real_d_loss))
+            self.log_vars.append(("d_loss_fake", fake_d_loss))
+            if cfg.TRAIN.B_WRONG:
+                self.log_vars.append(("d_loss_wrong", wrong_d_loss))
+        else:
+            self.log_vars.append(("hr_d_loss_real", real_d_loss))
+            self.log_vars.append(("hr_d_loss_fake", fake_d_loss))
+            if cfg.TRAIN.B_WRONG:
+                self.log_vars.append(("hr_d_loss_wrong", wrong_d_loss))
+
+        if flag == 'lr':
+            self.log_vars.append(("g_loss_fake", generator_loss))
+        elif flag == 'hr':
+            self.log_vars.append(("hr_g_loss_fake", generator_loss))
+        else:
+            NotImplementedError
+
+        return discriminator_loss, generator_loss
+
+    def init_opt(self):
+        self.build_placeholder()
+
+        with pt.defaults_scope(phase=pt.Phase.train):
+            # ####get output from G network####################################
+            with tf.variable_scope("g_net"):
+                c, kl_loss = self.sample_encoded_context(self.embeddings)
+                z = tf.random_normal([self.batch_size, cfg.Z_DIM])
+                self.log_vars.append(("hist_c", c))
+                self.log_vars.append(("hist_z", z))
+                fake_images = self.model.get_generator(tf.concat([c, z], 1))
+
+            # ####get discriminator_loss and generator_loss ###################
+            discriminator_loss, generator_loss =\
+                self.compute_losses(self.images,
+                                    self.wrong_images,
+                                    fake_images,
+                                    self.embeddings,
+                                    self.wrong_embeddings,
+                                    flag='lr')
+            generator_loss += kl_loss
+            self.log_vars.append(("g_loss_kl_loss", kl_loss))
+            self.log_vars.append(("g_loss", generator_loss))
+            self.log_vars.append(("d_loss", discriminator_loss))
+
+            # #### For hr_g and hr_d #########################################
+            with tf.variable_scope("hr_g_net"):
+                hr_c, hr_kl_loss = self.sample_encoded_context(self.embeddings)
+                self.log_vars.append(("hist_hr_c", hr_c))
+                hr_fake_images = self.model.hr_get_generator(fake_images, hr_c)
+            # get losses
+            hr_discriminator_loss, hr_generator_loss =\
+                self.compute_losses(self.hr_images,
+                                    self.hr_wrong_images,
+                                    hr_fake_images,
+                                    self.embeddings,
+                                    flag='hr')
+            hr_generator_loss += hr_kl_loss
+            self.log_vars.append(("hr_g_loss", hr_generator_loss))
+            self.log_vars.append(("hr_d_loss", hr_discriminator_loss))
+
+            # #######define self.g_sum, self.d_sum,....########################
+            self.prepare_trainer(discriminator_loss, generator_loss,
+                                 hr_discriminator_loss, hr_generator_loss)
+            self.define_summaries()
+
+        with pt.defaults_scope(phase=pt.Phase.test):
+            self.sampler()
+            self.visualization(cfg.TRAIN.NUM_COPY)
+            print("success")
 
     def train_one_step(self, generator_lr,
                        discriminator_lr,
@@ -71,7 +209,9 @@ class CondGANTrainer_mscoco(CondGANTrainer):
     def train(self):
         config = tf.ConfigProto(allow_soft_placement=True)
         with tf.Session(config=config) as sess:
-            self.hr_images, self.hr_wrong_images, self.embeddings =\
+            self.hr_images, self.hr_wrong_images, \
+                self.embeddings, self.wrong_images, \
+                self.captions, self.wrong_captions =\
                 self.dataset.get_batch(self.batch_size)
 
             self.images = tf.image.resize_bilinear(self.hr_images,
@@ -211,10 +351,57 @@ class CondGANTrainer_mscoco(CondGANTrainer):
             sess.run([self.superimages, self.image_summary,\
                 self.hr_superimages, self.hr_image_summary])
 
-        scipy.misc.imsave('%s/lr_fake_train_%d.jpg' %
-                          (self.log_dir, epoch), gen_samples[0])
+        selected_captions = []
+        for i in range(n):
+            selected_captions.append(caption2str(captions[i*n])[0])
 
-        scipy.misc.imsave('%s/hr_fake_train_%d.jpg' %
-                          (self.log_dir, epoch), hr_gen_samples[0])
+        self.save_image_caption(gen_samples[0], selected_captions, n,\
+            '%s/lr_train_%d.jpg' % (self.log_dir, epoch))
+
+        self.save_image_caption(hr_gen_samples[0], selected_captions, n,\
+            '%s/hr_train_%d.jpg' % (self.log_dir, epoch))
+
+        pfi_train = open(self.log_dir + "/train_%d.txt" % (epoch), "w")
+        for row in range(n):
+            pfi_train.write('\n***row %d***\n' % row)
+            for i in range(5):
+                pfi_train.write(selected_captions[n][i])
+        pfi_train.close()
 
         return img_summary, hr_img_summary
+
+
+    def save_image_caption(self, image, captions, n, filename,
+        hmargin = 15, vmargin1 = 3, vmargin2 = 2):
+        image = ((image + 1) * 128).astype(np.uint8)
+        imsize = [image.shape[0]/n, image.shape[1]/(n+1)]
+        new_image = np.zeros(((imsize[0]+hmargin)*n,
+            (imsize[1]+vmargin2)*(n+1)+vmargin1, 3), np.uint8)
+        for i in range(n):
+            new_image[(imsize[0]+hmargin)*i+hmargin:(imsize[0]+hmargin)*(i+1),\
+                0:imsize[1],:] = \
+                image[imsize[0]*i:imsize[0]*(i+1),0:imsize[1],:]
+            for j in range(n):
+                new_image[(imsize[0]+hmargin)*i+hmargin:(imsize[0]+hmargin)*(i+1),\
+                    (imsize[1]+vmargin2)*(j+1)+vmargin1:(imsize[1]+vmargin2)*(j+1)+vmargin1+imsize[1],:] = \
+                    image[imsize[0]*i:imsize[0]*(i+1),imsize[1]*(j+1):imsize[1]*(j+2),:]
+        fig = plt.figure()
+        plt.imshow(new_image)
+        for i in range(n):
+            plt.text(5, (imsize[0]+hmargin)*i+hmargin-5, captions[i],
+                color='w', fontsize = 10)
+        plt.axis('off')
+        fig.savefig(filename)
+        plt.close(fig)
+
+
+def caption2str(caption_array):
+    ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
+    captions = []
+    for j in range(5):
+        chars = []
+        for i in caption_array[:,j].tolist():
+            if i > 0:
+                chars.append(ALPHABET[i-1])
+        captions.append(''.join(chars))
+    return captions
