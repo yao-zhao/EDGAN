@@ -31,6 +31,10 @@ LEN_CHAR = 201
 NUM_CHAR = 5
 NUM_EMBED = 5
 
+PROCESS_ALL = False
+PROCESS_FUR_APP = False
+PROCESS_FUR_APP_MAJOR = True
+
 def get_ImageIds(coco, selected_supers):
     cats = coco.loadCats(coco.getCatIds())
     selected_subs = []
@@ -253,27 +257,26 @@ if __name__ == '__main__':
     embed_dir = os.path.join(COCO_DIR, 'train2014_ex_t7')
     annoFile=os.path.join(COCO_DIR, 'annotations', 'instances_train2014.json')
     coco=COCO(annoFile)
-    if True:
+    if PROCESS_ALL:
         selected_supers = \
             []
         filenames = get_ImageIds(coco, selected_supers)
         save_tfrecords(train_dir, embed_dir, COCO_DIR, filenames, tag='')
-
-    if False:
+        test_tfrecords(os.path.join(COCO_DIR, '76.tfrecords'))
+    
+    if PROCESS_FUR_APP:
         selected_supers = \
             ['furniture', 'appliance']
         filenames = get_ImageIds(coco, selected_supers)
         save_tfrecords(train_dir, embed_dir, COCO_DIR, filenames, tag='_fur_app')
+        test_tfrecords(os.path.join(COCO_DIR, '76_fur_app.tfrecords'))
 
-    if False:
+    if PROCESS_FUR_APP_MAJOR:
         selected_supers = \
             ['furniture', 'appliance']
         filenames = get_ImageIds_Major(coco, selected_supers, exceptions=['people'])
         save_tfrecords(train_dir, embed_dir, COCO_DIR, filenames, tag='_fur_app_major')
-
-    test_tfrecords(os.path.join(COCO_DIR, '76_fur_app_major.tfrecords'))
-    # test_tfrecords(os.path.join(COCO_DIR, '76.tfrecords'))
-    # test_tfrecords(os.path.join(COCO_DIR, '304.tfrecords'))
+        test_tfrecords(os.path.join(COCO_DIR, '76_fur_app_major.tfrecords'))
 
 
 def save_data_seperate(inpath, outpath):
