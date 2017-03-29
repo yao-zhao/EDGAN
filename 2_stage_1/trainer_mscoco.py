@@ -316,7 +316,7 @@ class CondGANTrainer_mscoco(CondGANTrainer):
         plt.imshow(new_image)
         for i in range(n):
             plt.text(5, (imsize[0]+hmargin)*i+hmargin-5, captions[i],
-                color='w', fontsize = 10)
+                color='w', fontsize = 10 * (imsize[0]/64))
         plt.axis('off')
         fig.savefig(filename)
         plt.close(fig)

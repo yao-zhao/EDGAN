@@ -4,6 +4,7 @@ from __future__ import print_function
 import prettytensor as pt
 import tensorflow as tf
 import numpy as np
+import matplotlib.pyplot as plt
 import scipy.misc
 import os
 import sys
@@ -46,7 +47,7 @@ class CondGANTrainer_mscoco(CondGANTrainer):
             cfg.DATASET.EMBEDDING_NORM_FACTOR
 
     def compute_losses(self, images, wrong_images,
-                       fake_images, embeddings, flag='lr'):
+                       fake_images, embeddings, wrong_embeddings, flag='lr'):
         if flag == 'lr':
             real_logit =\
                 self.model.get_discriminator(images, embeddings)
@@ -165,6 +166,7 @@ class CondGANTrainer_mscoco(CondGANTrainer):
                                     self.hr_wrong_images,
                                     hr_fake_images,
                                     self.embeddings,
+                                    self.wrong_embeddings,
                                     flag='hr')
             hr_generator_loss += hr_kl_loss
             self.log_vars.append(("hr_g_loss", hr_generator_loss))
@@ -210,7 +212,7 @@ class CondGANTrainer_mscoco(CondGANTrainer):
         config = tf.ConfigProto(allow_soft_placement=True)
         with tf.Session(config=config) as sess:
             self.hr_images, self.hr_wrong_images, \
-                self.embeddings, self.wrong_images, \
+                self.embeddings, self.wrong_embeddings, \
                 self.captions, self.wrong_captions =\
                 self.dataset.get_batch(self.batch_size)
 
@@ -347,9 +349,9 @@ class CondGANTrainer_mscoco(CondGANTrainer):
         return out
 
     def epoch_sum_images(self, sess, n, epoch):
-        gen_samples, img_summary, hr_gen_samples, hr_img_summary =\
+        gen_samples, img_summary, hr_gen_samples, hr_img_summary, captions =\
             sess.run([self.superimages, self.image_summary,\
-                self.hr_superimages, self.hr_image_summary])
+                self.hr_superimages, self.hr_image_summary, self.captions])
 
         selected_captions = []
         all_captions = []
@@ -375,7 +377,8 @@ class CondGANTrainer_mscoco(CondGANTrainer):
     def save_image_caption(self, image, captions, n, filename,
         hmargin = 15, vmargin1 = 3, vmargin2 = 2):
         image = ((image + 1) * 128).astype(np.uint8)
-        imsize = [image.shape[0]/n, image.shape[1]/(n+1)]
+        imsize = [int(image.shape[0]/n), int(image.shape[1]/(n+1))]
+        hmargin = int(hmargin * (imsize[0]/64))
         new_image = np.zeros(((imsize[0]+hmargin)*n,
             (imsize[1]+vmargin2)*(n+1)+vmargin1, 3), np.uint8)
         for i in range(n):
@@ -386,11 +389,11 @@ class CondGANTrainer_mscoco(CondGANTrainer):
                 new_image[(imsize[0]+hmargin)*i+hmargin:(imsize[0]+hmargin)*(i+1),\
                     (imsize[1]+vmargin2)*(j+1)+vmargin1:(imsize[1]+vmargin2)*(j+1)+vmargin1+imsize[1],:] = \
                     image[imsize[0]*i:imsize[0]*(i+1),imsize[1]*(j+1):imsize[1]*(j+2),:]
-        fig = plt.figure()
+        fig = plt.figure(figsize=(imsize[1]/8, imsize[0]/8))
         plt.imshow(new_image)
         for i in range(n):
             plt.text(5, (imsize[0]+hmargin)*i+hmargin-5, captions[i],
-                color='w', fontsize = 10)
+                color='w', fontsize = 10 * (imsize[0]/64))
         plt.axis('off')
         fig.savefig(filename)
         plt.close(fig)

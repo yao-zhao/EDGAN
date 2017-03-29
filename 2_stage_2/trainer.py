@@ -434,7 +434,7 @@ class CondGANTrainer(object):
     def build_model(self, sess):
         self.init_opt()
 
-        sess.run(tf.initialize_all_variables())
+        sess.run(tf.global_variables_initializer())
         if len(self.model_path) > 0:
             print("Reading model parameters from %s" % self.model_path)
             all_vars = tf.trainable_variables()
@@ -450,7 +450,7 @@ class CondGANTrainer(object):
             istart = self.model_path.rfind('_') + 1
             iend = self.model_path.rfind('.')
             counter = self.model_path[istart:iend]
-            counter = int(counter)
+            counter = int(float(counter) / cfg.TRAIN.BATCH_SIZE_MODIFIER)
         else:
             print("Created model with fresh parameters.")
             counter = 0
