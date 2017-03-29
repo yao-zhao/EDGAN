@@ -285,11 +285,15 @@ class CondGANTrainer_mscoco(CondGANTrainer):
         for i in range(n):
             selected_captions.append(caption2str(captions[i*n])[0])
 
-        # scipy.misc.imsave(\
-        #     '%s/train_%d.jpg' % (self.log_dir, epoch), gen_samples[0])
-
         self.save_image_caption(gen_samples[0], selected_captions, n,\
             '%s/train_%d.jpg' % (self.log_dir, epoch))
+
+        pfi_test = open(self.log_dir + "/train_%d.txt" % (epoch), "w")
+        for row in range(n):
+            pfi_test.write('\n***row %d***\n' % row)
+            for i in range(5):
+                pfi_test.write(selected_captions[n][i])
+        pfi_test.close()
 
         return img_summary
 
