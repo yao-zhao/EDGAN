@@ -41,7 +41,7 @@ class CondGANTrainer_mscoco(CondGANTrainer):
         self.fake_images = self.model.get_generator(tf.concat([c, z], 1))
 
     def compute_embeddings_distances(self, embeddings1, embeddings2):
-        return tf.reduce_sum(tf.multiply(embeddings1, embeddings2)) / \
+        return tf.reduce_sum(tf.multiply(embeddings1, embeddings2), axis = 1) / \
             cfg.DATASET.EMBEDDING_NORM_FACTOR
 
 
@@ -135,7 +135,7 @@ class CondGANTrainer_mscoco(CondGANTrainer):
             with tf.variable_scope("g_net", reuse=True):
                 self.sampler()
             self.visualization(cfg.TRAIN.NUM_COPY)
-            print("success")
+            print("model building success")
 
     def train(self):
         config = tf.ConfigProto(allow_soft_placement=True)
@@ -280,7 +280,6 @@ class CondGANTrainer_mscoco(CondGANTrainer):
     def epoch_sum_images(self, sess, n, epoch):
         gen_samples, img_summary, captions =\
             sess.run([self.superimages, self.image_summary, self.captions])
-        print(gen_samples.shape)
 
         selected_captions = []
         for i in range(n):
