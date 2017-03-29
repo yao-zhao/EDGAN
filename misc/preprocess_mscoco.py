@@ -27,13 +27,16 @@ DEBUG = False
 FILTER_ASPECT_RATIO = True
 ASPECT_RATIO = 9/16
 AREA_TH = 0.01
+AREA_LARGEST_RATIO_TH = 0.7
+
 LEN_CHAR = 201
 NUM_CHAR = 5
 NUM_EMBED = 5
 
 PROCESS_ALL = False
 PROCESS_FUR_APP = False
-PROCESS_FUR_APP_MAJOR = True
+PROCESS_FUR_APP_MAJOR = False
+PROCESS_CAT_DOG = True
 
 def get_ImageIds(coco, selected_supers):
     cats = coco.loadCats(coco.getCatIds())
@@ -82,16 +85,64 @@ def get_ImageIds_Major(coco, selected_supers, exceptions=[]):
 
         annIds = coco.getAnnIds(imgIds=img['id'], iscrowd=None)
         annotations = coco.loadAnns(annIds)
-        pass_filter = True
         img_area = img['height'] * img['width']
         areas = [anno['area'] for anno in annotations]
         areas.sort()
         third_max = 0 if len(areas) < 3 else areas[2]
+        pass_filter = True
         for anno in annotations:
             if anno['category_id'] not in allowed_ids and \
                 anno['area'] > third_max and\
                 anno['area'] > AREA_TH*img_area:
                 pass_filter = False
+                break
+        if pass_filter is False:
+            continue
+
+        image_names.append(img['file_name'])
+    print('%0.2f percent images (%d) left after filtering' \
+        % (len(image_names) / float(len(imgIds)), len(image_names)))
+    return image_names
+
+
+def get_ImageIds_Largest(coco, selected_classes, exceptions=[]):
+    cats = coco.loadCats(coco.getCatIds())
+    selected_subs = []
+    for cat in cats:
+        if cat['name'] in selected_classes:
+            selected_subs.append((cat['name']))
+    print('chosen sub classes: '+' '.join(selected_subs))
+    imgIds = []
+    for sub in selected_subs:
+        catIds = coco.getCatIds(catNms=sub);
+        imgIds.extend(coco.getImgIds(catIds=catIds))
+    imgIds = list(np.unique(imgIds))
+    allowed_subs = selected_subs + exceptions
+    allowed_ids = coco.getCatIds(catNms=allowed_subs);
+    image_names = []
+    for img in coco.loadImgs(imgIds):
+        if FILTER_ASPECT_RATIO is True:
+            aspect_ratio = img['height']/img['width']
+            if aspect_ratio < ASPECT_RATIO or aspect_ratio > 1/ASPECT_RATIO:
+                continue
+
+        annIds = coco.getAnnIds(imgIds=img['id'], iscrowd=None)
+        annotations = coco.loadAnns(annIds)
+        img_area = img['height'] * img['width']
+        areas = np.array([anno['area'] for anno in annotations])
+        # max_id = np.argmax(areas)
+        # if annotations[max_id]['category_id'] not in allowed_ids \
+        #     or areas[max_id] < AREA_LARGEST_TH * img_area:
+        #     continue
+        areas.sort()
+        third_max = 0 if len(areas) < 3 else areas[2]
+        pass_filter = False
+        for anno in annotations:
+            if anno['category_id'] in allowed_ids and \
+                anno['area'] > third_max and \
+                anno['area'] > areas[0] * AREA_LARGEST_RATIO_TH and \
+                anno['area'] > AREA_TH*img_area:
+                pass_filter = True
                 break
         if pass_filter is False:
             continue
@@ -277,6 +328,14 @@ if __name__ == '__main__':
         filenames = get_ImageIds_Major(coco, selected_supers, exceptions=['people'])
         save_tfrecords(train_dir, embed_dir, COCO_DIR, filenames, tag='_fur_app_major')
         test_tfrecords(os.path.join(COCO_DIR, '76_fur_app_major.tfrecords'))
+
+    if PROCESS_CAT_DOG:
+        selected_subs = \
+            ['cat', 'dog']
+        filenames = get_ImageIds_Largest(coco, selected_subs)
+        save_tfrecords(train_dir, embed_dir, COCO_DIR, filenames,
+            tag='_cat_dog')
+        test_tfrecords(os.path.join(COCO_DIR, '76_cat_dog.tfrecords'))
 
 
 def save_data_seperate(inpath, outpath):
