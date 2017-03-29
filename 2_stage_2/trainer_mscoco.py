@@ -352,8 +352,10 @@ class CondGANTrainer_mscoco(CondGANTrainer):
                 self.hr_superimages, self.hr_image_summary])
 
         selected_captions = []
+        all_captions = []
         for i in range(n):
             selected_captions.append(caption2str(captions[i*n])[0])
+            all_captions.append('\n'.join(caption2str(captions[i*n])))
 
         self.save_image_caption(gen_samples[0], selected_captions, n,\
             '%s/lr_train_%d.jpg' % (self.log_dir, epoch))
@@ -364,8 +366,7 @@ class CondGANTrainer_mscoco(CondGANTrainer):
         pfi_train = open(self.log_dir + "/train_%d.txt" % (epoch), "w")
         for row in range(n):
             pfi_train.write('\n***row %d***\n' % row)
-            for i in range(5):
-                pfi_train.write(selected_captions[n][i])
+            pfi_train.write(all_captions[row])
         pfi_train.close()
 
         return img_summary, hr_img_summary
