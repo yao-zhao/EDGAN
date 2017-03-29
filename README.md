@@ -13,8 +13,20 @@ use MSCOCO data set
 for selected supercategory
 ,write them into tfrecords file along with the corresponding caption embedding.
 
+<!-- potential other data set, not as good
+yelp data set
+visual genome data set
+ -->
 
 # New features
+
+## Data input pipline
+- use mscoco python API
+- dataloader that load tfrecords from mscoco
+- image augumentation including cropping, flipping, and standarlization (when downsample the image, use INTER_AREA method)
+- sampling from multiple caption embeddings, visualize embedding distributions
+- negative example (use inner product of embedding captions, see method CLSGAN)
+- filter out selective images based on classes and their areas
 
 <!-- ## Sentense embedding with visual information -->
 
@@ -35,32 +47,20 @@ for selected supercategory
 - Transfer resnet from Caffe to Tensorflow
 - Train resnet to classify the 80 categories of objects in MSCOCO
 
-## Data input pipline
-- use mscoco python API
-- dataloader that load tfrecords from mscoco
-- image augumentation including cropping, flipping, and standarlization (when downsample the image, use INTER_AREA method)
-- sampling from multiple caption embeddings, visualize embedding distributions
-- negative example (use inner product of embedding captions, see method CLSGAN)
-- filter out selective images based on classes and their areas
 
-<!-- potential other data set, not as good
-yelp data set
-visual genome data set
- -->
 
 # ToDo List
 ## minor
 - check regularization
-- in WGAN, disable embedding weight clipping
 
 ## major
-- debug second stage gan
-- test CLSGAN
+- test second stage gan
+- create demo
 
 # To Do List Future
 
-- further test wgan
-- better negative sampling
+- further test wgan, (test disable embedding weight clipping first)
+- explore different negative sampling
 
 - train classification (takes long, should do it in caffe)
 - generate classification map (try use ground truth)
@@ -72,6 +72,7 @@ visual genome data set
 - WGAN, takes longer to train, unclear about improvements (worse on bird, better on mscoco)
 - LSGAN, wrose result, shorter to train
 - lr need to be low, 0.0002 instead of 0.002
+- CLSGAN, really good result on mscoco
 
 # References publications
 - [StackGAN]
