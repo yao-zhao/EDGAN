@@ -359,11 +359,14 @@ class CondGANTrainer_mscoco(CondGANTrainer):
             selected_captions.append(caption2str(captions[i*n])[0])
             all_captions.append('\n'.join(caption2str(captions[i*n])))
 
-        self.save_image_caption(gen_samples[0], selected_captions, n,\
-            '%s/lr_train_%d.jpg' % (self.log_dir, epoch))
+        try:
+            self.save_image_caption(gen_samples[0], selected_captions, n,\
+                '%s/lr_train_%d.jpg' % (self.log_dir, epoch))
 
-        self.save_image_caption(hr_gen_samples[0], selected_captions, n,\
-            '%s/hr_train_%d.jpg' % (self.log_dir, epoch))
+            self.save_image_caption(hr_gen_samples[0], selected_captions, n,\
+                '%s/hr_train_%d.jpg' % (self.log_dir, epoch))
+        except Exception as e:
+            print(str(e))
 
         pfi_train = open(self.log_dir + "/train_%d.txt" % (epoch), "w")
         for row in range(n):
