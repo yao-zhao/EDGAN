@@ -437,13 +437,12 @@ class CondGANTrainer(object):
         sess.run(tf.global_variables_initializer())
         if len(self.model_path) > 0:
             print("Reading model parameters from %s" % self.model_path)
-            all_vars = tf.trainable_variables()
-            # all_vars = tf.all_variables()
+            all_vars = tf.all_variables()
             restore_vars = []
             for var in all_vars:
-                if var.name.startswith('g_') or var.name.startswith('d_'):
+                if var.name.startswith('g_') or var.name.startswith('d_') or\
+                    var.name.startswith('hr_g_') or var.name.startswith('hr_d_'):
                     restore_vars.append(var)
-                    # print(var.name)
             saver = tf.train.Saver(restore_vars)
             saver.restore(sess, self.model_path)
             print("model restored")
