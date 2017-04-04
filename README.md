@@ -1,4 +1,4 @@
-# iGAN
+# EDGAN
 
 This repository modifies the original StackGAN code from
 [github](https://github.com/hanzhanggit/StackGAN).
@@ -34,6 +34,7 @@ visual genome data set
 - enlarge capacity of generator network, adding 3 residual blocks.
 - change relu to leaky relu
 - option to no batch norm in discriminator
+- increase or reduce discriminator final dimension
 
 ## Multiple training methods of GAN
 - Option to trian with vanilla GAN
@@ -42,13 +43,13 @@ visual genome data set
 - Option to train with CLSGAN, continous least square GAN that estimates the inner products of embeddings between right caption embeddings and wrong caption embeddings.
 - Option to train with BGAN (not implemented yet)
 
-## Classification Transfering from Imagenet to MSCOCO
+## Classification Transfering from Imagenet to MSCOCO (for future 3 stage GAN)
 - Label each image in MSCOCO with multiple labels for objects that have area larger than the threshold
 - Transfer resnet from Caffe to Tensorflow
 - Train resnet to classify the 80 categories of objects in MSCOCO
 
 
-
+<!-- 
 # ToDo List
 ## minor
 - check regularization
@@ -56,6 +57,8 @@ visual genome data set
 ## major
 - test second stage gan
 - create demo
+- feature mapping
+- test dog cat
 
 # To Do List Future
 
@@ -72,7 +75,9 @@ visual genome data set
 - WGAN, takes longer to train, unclear about improvements (worse on bird, better on mscoco)
 - LSGAN, wrose result, shorter to train
 - lr need to be low, 0.0002 instead of 0.002
-- CLSGAN, really good result on mscoco
+- CLSGAN, really good result on mscoco 
+- deconv may cause patterns, resize is better
+-->
 
 # References publications
 - [StackGAN]
@@ -82,32 +87,12 @@ visual genome data set
 - [LSGAN]
 - [BGAN]
 
-<!-- 
-things to correct:
-2_stage_1 wgan config not specify nobatchnorm, it use default large instead -->
 
-
-<!-- 
-# retest things!
-
-lr rate not loaded need to used load
-
-# scope things down to class generation instead of text generation?
-
-# questions:
-
-- regularization?
-
+<!---
+- regularization
 
 - own implementation
 error possible discriminator variable sharing
 
-
 - gate gradients -->
 
-
-<!-- 
-notes:
-
-deconv may cause patterns, resize is better
- -->
