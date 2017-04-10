@@ -80,12 +80,12 @@ visual genome data set
 -->
 
 # References publications
-- [StackGAN]
-- [text2image]
+- [StackGAN](https://arxiv.org/pdf/1612.03242.pdf)
+- [text2image](https://arxiv.org/pdf/1605.05396.pdf)
 - [char-RNN-CNN]
-- [WGAN]
-- [LSGAN]
-- [BGAN]
+- [WGAN](https://arxiv.org/pdf/1701.07875.pdf)
+- [LSGAN](https://arxiv.org/pdf/1611.04076.pdf)
+- [BGAN](https://arxiv.org/pdf/1702.08431.pdf)
 
 
 <!---
