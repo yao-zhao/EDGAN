@@ -58,7 +58,8 @@ def get_cat_dict(coco):
         cat_dict[cat['id']] = cat['name']
     return cat_dict
 
-def plot_embedding(X, cat_ids, cat_dict, save_path = 'visualization/mscoco_tsne.jpg'):
+def plot_embedding(X, cat_ids, cat_dict,
+        save_path = 'visualization/mscoco_tsne.jpg'):
     x_min, x_max = np.min(X, 0), np.max(X, 0)
     X = (X - x_min) / (x_max - x_min)
     cat_ids = (cat_ids).astype(np.float)
@@ -99,6 +100,9 @@ if __name__ == '__main__':
     cat_dict = get_cat_dict(coco)
     selected_embeddings = embeddings[selected_ids, :]
     selected_cat_ids = categories[selected_ids]
-    tsne = TSNE(n_components=2, init='pca', random_state=0, verbose=10)
-    embeddings_tsne = tsne.fit_transform(selected_embeddings[::, :])
-    plot_embedding(embeddings_tsne, selected_cat_ids, cat_dict)
+    for perplexity in [5, 10, 20, 50, 100]:
+        tsne = TSNE(n_components=2, init='pca', random_state=0, verbose=10,
+            perplexity=perplexity)
+        embeddings_tsne = tsne.fit_transform(selected_embeddings[::, :])
+        plot_embedding(embeddings_tsne, selected_cat_ids, cat_dict,
+            save_path = 'visualization/mscoco_tsne_'+str(perplexity)+'.jpg')

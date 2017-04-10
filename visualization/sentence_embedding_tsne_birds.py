@@ -35,7 +35,8 @@ def get_embeddings(picklepath):
     return embeddings
 
 
-def plot_embedding(X, cat_ids, cat_dict, save_path = 'visualization/bird_tsne.jpg'):
+def plot_embedding(X, cat_ids, cat_dict,
+        save_path = 'visualization/bird_tsne.jpg'):
     x_min, x_max = np.min(X, 0), np.max(X, 0)
     X = (X - x_min) / (x_max - x_min)
             
@@ -58,9 +59,12 @@ if __name__ == '__main__':
     selected_indices = cat_ids % 6 == 0
     selected_cat_ids = cat_ids[selected_indices]
     selected_embeddings = embeddings[selected_indices, :]
-    tsne = TSNE(n_components=2, init='pca', random_state=0, verbose=10)
-    embeddings_tsne = tsne.fit_transform(selected_embeddings[::, :])
-    plot_embedding(embeddings_tsne, selected_cat_ids, cat_dict)
+    for perplexity in [5, 10, 20, 50, 100]:
+        tsne = TSNE(n_components=2, init='pca', random_state=0, verbose=10,
+            perplexity=perplexity)
+        embeddings_tsne = tsne.fit_transform(selected_embeddings[::, :])
+        plot_embedding(embeddings_tsne, selected_cat_ids, cat_dict,
+            save_path = 'visualization/bird_tsne_'+str(perplexity)+'.jpg')
 
 
 
